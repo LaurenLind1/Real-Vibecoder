@@ -223,7 +223,7 @@ export function ProjectShell({ project, onChange }: Props) {
     onChange({ ...project, selectedModel: model });
   }
 
-  const selectedProviderKeyId = project.selectedProviderId ?? settings.defaultProviderKeyId ?? "";
+  const selectedProviderKeyId = project.selectedProviderId ?? "default";
   const selectedProviderKey = settings.providers.find((p) => p.id === selectedProviderKeyId) ?? null;
   const activeProviderKey = project.selectedProviderId
     ? settings.providers.find((p) => p.id === project.selectedProviderId) ?? null
@@ -375,12 +375,12 @@ export function ProjectShell({ project, onChange }: Props) {
                 <div className="mt-6 grid gap-3 sm:grid-cols-2">
                   <div>
                     <Label>Project provider</Label>
-                    <Select value={selectedProviderKeyId} onValueChange={(v) => setProjectProvider(v || undefined)}>
+                    <Select value={selectedProviderKeyId} onValueChange={(v) => setProjectProvider(v === "default" ? undefined : v)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Provider" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Use default</SelectItem>
+                        <SelectItem value="default">Use default</SelectItem>
                         {settings.providers.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
                             {p.label}
@@ -391,7 +391,7 @@ export function ProjectShell({ project, onChange }: Props) {
                   </div>
                   <div>
                     <Label>Project model</Label>
-                    <Select value={project.selectedModel ?? settings.defaultModel ?? ""} onValueChange={(v) => setProjectModel(v)}>
+                    <Select value={project.selectedModel ?? settings.defaultModel} onValueChange={(v) => setProjectModel(v)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Model" />
                       </SelectTrigger>

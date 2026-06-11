@@ -52,8 +52,9 @@ function Dashboard() {
 
   // 🔒 Validation network processing animation flags
   const [isTesting, setIsTesting] = useState<boolean>(false);
+  const [testingKeyId, setTestingKeyId] = useState<string | null>(null);
 
-  // 📢 Status alert banners pinned to the browser ceiling
+  // 📢 Status alert banners pinned to the top right of the browser viewport
   const [notification, setNotification] = useState<BannerNotification | null>(null);
 
   // 📋 Main database list of successfully committed user credentials
@@ -78,7 +79,7 @@ function Dashboard() {
     );
   };
 
-  // Direct asynchronous lookup to check credentials before committing
+  // Direct asynchronous lookup to check credentials before committing or when testing active rows
   const runKeyValidationProbe = async (provider: KeyProvider, secretKey: string): Promise<boolean> => {
     try {
       if (provider === "gemini") {
@@ -103,7 +104,7 @@ function Dashboard() {
         const res = await fetch(secretKey || "http://localhost:11434");
         return res.ok;
       }
-      // General handler fallback for standardized providers (Mistral, Groq, DeepSeek, OpenRouter)
+      
       const baseUrlMap: Record<string, string> = {
         mistral: "https://api.mistral.ai/v1/models",
         groq: "https://api.groq.com/openai/v1/models",
@@ -113,7 +114,7 @@ function Dashboard() {
       };
       
       const targetUrl = baseUrlMap[provider];
-      if (!targetUrl) return true; // Accept custom fields seamlessly
+      if (!targetUrl) return true;
 
       const res = await fetch(targetUrl, {
         headers: { Authorization: `Bearer ${secretKey}` }
@@ -124,6 +125,7 @@ function Dashboard() {
     }
   };
 
+  // Handler for adding a key from the inputs at the bottom
   const handleTestAndAdd = async () => {
     if (!inputKey.trim()) {
       setNotification({ type: "error", message: "Please insert an API key string before attempting a test." });
@@ -156,12 +158,25 @@ function Dashboard() {
       };
 
       setSavedProviders((prev) => [...prev, newCred]);
-      setNotification({ type: "success", message: `Success! ${finalLabel} verified and added perfectly.` });
+      setNotification({ type: "success", message: "Key works" });
       
       setInputKey("");
       setCustomLabel("");
     } else {
-      setNotification({ type: "error", message: "The key is not working. Check permissions or formatting and try again." });
+      setNotification({ type: "error", message: "Key is not working" });
+    }
+  };
+
+  // 🧪 New Inline validation action handler for testing active saved rows
+  const handleInlineTestKey = async (cred: SavedCredential) => {
+    setTestingKeyId(cred.id);
+    const isValid = await runKeyValidationProbe(cred.provider, cred.key);
+    setTestingKeyId(null);
+
+    if (isValid) {
+      setNotification({ type: "success", message: "Key works" });
+    } else {
+      setNotification({ type: "error", message: "Key is not working" });
     }
   };
 
@@ -172,10 +187,10 @@ function Dashboard() {
   return (
     <div className="flex h-screen flex-col overflow-hidden text-slate-900 relative">
       
-      {/* 🚨 Floating Global Status Banners */}
+      {/* 🚨 Floating Global Status Banners positioned in the top-right corner */}
       {notification && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4 animate-in fade-in slide-in-from-top-4 duration-200">
-          <div className={`flex items-center gap-3 rounded-lg border p-4 shadow-xl text-sm font-medium ${
+        <div className="fixed top-4 right-4 z-[100] w-full max-w-sm animate-in fade-in slide-in-from-top-4 duration-200">
+          <div className={`flex items-center gap-3 rounded-xl border p-4 shadow-xl text-sm font-medium ${
             notification.type === "success" 
               ? "bg-emerald-50 border-emerald-200 text-emerald-800" 
               : "bg-rose-50 border-rose-200 text-rose-800"
@@ -186,7 +201,7 @@ function Dashboard() {
               <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0" />
             )}
             <span className="flex-1 leading-snug">{notification.message}</span>
-            <button onClick={() => setNotification(null)} className="text-current opacity-60 hover:opacity-100 transition-opacity">
+            <button onClick={() => setNotification(null)} className="text-current opacity-40 hover:opacity-100 transition-opacity">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -330,20 +345,40 @@ function Dashboard() {
                 <div className="space-y-2">
                   <span className="text-xs font-semibold text-slate-700 block mb-1">Active Credentials</span>
                   {savedProviders.map((cred) => (
-                    <div key={cred.id} className="flex items-center justify-between rounded-lg border border-slate-100 p-3 bg-slate-50/50 text-xs">
+                    <div key={cred.id} className="flex items-center justify-between rounded-xl border border-slate-200/60 p-4 bg-white shadow-sm text-sm">
                       <div>
-                        <div className="font-semibold text-slate-800 flex items-center gap-2">
+                        <div className="font-semibold text-slate-900 flex items-center gap-2">
                           {cred.label}
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-normal uppercase bg-slate-200 text-slate-700">{cred.provider}</span>
+                          {cred.id === savedProviders[0].id && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-900 text-white">Default</span>
+                          )}
                         </div>
-                        <div className="text-slate-400 font-mono mt-0.5">••••••••••••{cred.key.slice(-4) || "Key"}</div>
+                        <div className="text-slate-400 text-xs mt-1 flex gap-2 items-center">
+                          <span>{cred.provider === "gemini" ? "Google Gemini" : cred.provider}</span>
+                          <span>•</span>
+                          <span className="font-mono">{cred.key.slice(0, 4)}...{cred.key.slice(-4) || "Key"}</span>
+                        </div>
                       </div>
-                      <button 
-                        onClick={() => handleDeleteCredential(cred.id)}
-                        className="text-slate-400 hover:text-red-500 p-1 rounded-md transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      
+                      {/* Interactive Actions Panel Container matching layout */}
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => handleInlineTestKey(cred)}
+                          disabled={testingKeyId !== null}
+                          className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors focus:outline-none disabled:opacity-40 flex items-center gap-1"
+                        >
+                          {testingKeyId === cred.id ? (
+                            <RefreshCw className="h-3 w-3 animate-spin" />
+                          ) : null}
+                          <span>Test</span>
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteCredential(cred.id)}
+                          className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition-colors focus:outline-none"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -413,7 +448,7 @@ function Dashboard() {
                     <span>Verifying Credentials...</span>
                   </>
                 ) : (
-                  <span>+ Test Key & Add</span>
+                  <span>+ Add</span>
                 )}
               </button>
             </div>

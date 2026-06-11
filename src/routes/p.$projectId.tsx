@@ -53,10 +53,7 @@ interface Project {
 }
 
 function Dashboard() {
-  // 🧭 Page Architecture State
   const [currentPage, setCurrentPage] = useState<PageView>("landing");
-
-  // Default empty project view
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
 
   const [activeFeatures, setActiveFeatures] = useState({
@@ -112,7 +109,6 @@ function Dashboard() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // 🕒 Fix: Timer only runs in chatbox view
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (currentPage === "chatbox" && isGenerating && activeFeatures.liveTimer) {
@@ -204,14 +200,13 @@ function Dashboard() {
 
     const rawPrompt = chatInput.trim();
     
-    // Add to project history automatically when initialized
-    if (currentPage !== "chatbox") {
+    // Create an initial project record if this is the first interaction in a new sandbox
+    if (messages.length === 1 && recentProjects.length === 0) {
       const readableName = rawPrompt.length > 32 ? rawPrompt.substring(0, 32) + "..." : rawPrompt;
       setRecentProjects(prev => [
         { id: crypto.randomUUID(), name: readableName, date: new Date(), fileCount: 1 },
         ...prev
       ]);
-      setCurrentPage("chatbox");
     }
 
     setChatInput("");
@@ -220,10 +215,7 @@ function Dashboard() {
 
   const sendToAI = async (messageText: string) => {
     const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: messageText,
-      timestamp: new Date()
+      id: crypto.randomUUID(), role: "user", content: messageText, timestamp: new Date()
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -242,7 +234,7 @@ function Dashboard() {
     if (!activeCredential) {
       setTimeout(() => {
         setMessages((prev) => [...prev, {
-          id: crypto.randomUUID(), role: "assistant", content: `⚠️ No active key found for "${primaryTargetProvider}". Please use the "API Keys Configuration" button to get connected.`, timestamp: new Date()
+          id: crypto.randomUUID(), role: "assistant", content: `⚠️ No active key found for "${primaryTargetProvider}". Please use the "API Config" button to get connected.`, timestamp: new Date()
         }]);
         setIsGenerating(false);
       }, 800);
@@ -304,76 +296,61 @@ function Dashboard() {
         </div>
       )}
 
-      {/* 🚀 PAGE ONE: LANDING PAGE */}
+      {/* 🚀 PAGE ONE: LANDING PAGE (Now Light Theme) */}
       {currentPage === "landing" && (
-        <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans justify-between relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent_45%)]" />
+        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans justify-between relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.08),transparent_45%)]" />
           
-          <header className="flex h-20 items-center justify-between px-10 w-full border-b border-slate-800/60 relative z-10 backdrop-blur-md bg-slate-900/40">
+          <header className="flex h-20 items-center justify-between px-10 w-full border-b border-slate-200 relative z-10 backdrop-blur-md bg-white/60">
             <div className="flex items-center gap-2.5 font-black text-xl tracking-tight">
-              <Sparkles className="h-6 w-6 text-indigo-400" />
+              <Sparkles className="h-6 w-6 text-indigo-600" />
               <span>VibeCoder</span>
             </div>
 
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => setCurrentPage("home")}
-                className="text-sm font-medium text-slate-300 hover:text-white transition-colors"
+                className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
               >
                 Dashboard
               </button>
-              {/* Prominent High Visibility Key Target */}
               <button 
                 onClick={() => setIsKeyPanelOpen(true)} 
-                className="flex items-center gap-2.5 text-sm font-bold bg-indigo-600 text-white px-6 py-3 rounded-xl transition-all hover:bg-indigo-500 shadow-[0_4px_20px_rgba(79,70,229,0.3)] hover:scale-[1.02] active:scale-[0.98]"
+                className="flex items-center gap-2.5 text-sm font-bold bg-slate-900 text-white px-6 py-3 rounded-xl transition-all hover:bg-slate-800 shadow-sm hover:scale-[1.02] active:scale-[0.98]"
               >
                 <Key className="h-4 w-4" />
-                <span>Configure Required API Keys</span>
+                <span>API Keys</span>
               </button>
             </div>
           </header>
 
           <main className="flex-1 flex flex-col items-center justify-center text-center px-6 max-w-3xl mx-auto relative z-10 py-16">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-xs text-slate-300 font-medium mb-6">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" /> Next-Gen AI Sandbox Engine
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-slate-200 text-xs text-slate-600 font-medium mb-6 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" /> Next-Gen AI Sandbox Engine
             </div>
-            <h1 className="text-5xl md:text-6xl font-black tracking-tight text-white mb-6 leading-[1.1]">
-              Vibe-code apps with <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-sky-400 to-emerald-400">any LLM model</span>.
+            <h1 className="text-5xl md:text-6xl font-black tracking-tight text-slate-900 mb-6 leading-[1.1]">
+              Vibe-code apps with <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-sky-500 to-emerald-500">any LLM model</span>.
             </h1>
-            <p className="text-slate-400 text-lg md:text-xl max-w-2xl mb-10 leading-relaxed">
+            <p className="text-slate-500 text-lg md:text-xl max-w-2xl mb-10 leading-relaxed">
               Bring your own API keys. Prompt, blueprint, iterate, and monitor your sandbox build steps in real-time. Completely client-side and sandboxed.
             </p>
 
-            <form onSubmit={handleFormSubmit} className="w-full relative max-w-2xl group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500 rounded-2xl blur opacity-25 group-focus-within:opacity-50 transition duration-500" />
-              <div className="relative bg-slate-900 border border-slate-700 rounded-2xl p-2 shadow-2xl flex items-center">
-                <textarea
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (chatInput.trim()) handleFormSubmit(); }
-                  }}
-                  placeholder="Describe what you want to build... (e.g. A markdown editor with dark mode)"
-                  className="w-full bg-transparent text-white placeholder-slate-500 p-4 outline-none resize-none h-16 text-lg"
-                />
-                <button 
-                  type="submit" 
-                  disabled={!chatInput.trim()}
-                  className="bg-white text-slate-900 p-4 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-200 transition-colors disabled:opacity-50 mr-1"
-                >
-                  Build <ArrowRight className="h-5 w-5" />
-                </button>
-              </div>
-            </form>
+            {/* Changed from a form to a direct CTA button that routes to the Home page */}
+            <button 
+              onClick={() => setCurrentPage("home")} 
+              className="bg-indigo-600 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-md text-lg hover:-translate-y-0.5"
+            >
+              Enter Dashboard <ArrowRight className="h-5 w-5" />
+            </button>
             
             {savedProviders.length === 0 && (
-               <div className="mt-6 flex items-center gap-2 text-amber-400 text-sm font-medium">
-                 <AlertTriangle className="h-4 w-4" /> You need to add an API key before generating.
+               <div className="mt-6 flex items-center gap-2 text-slate-500 text-sm font-medium">
+                 <AlertTriangle className="h-4 w-4 text-amber-500" /> You will need to add an API key inside to build.
                </div>
             )}
           </main>
           
-          <footer className="py-6 text-center text-slate-600 text-sm relative z-10">
+          <footer className="py-6 text-center text-slate-400 text-sm relative z-10 font-medium">
             Powered by standard multi-provider endpoints. Keys are stored locally.
           </footer>
         </div>
@@ -404,12 +381,12 @@ function Dashboard() {
                 }`}
               >
                 <Key className="h-4 w-4" />
-                <span>API Providers</span>
+                <span>API Keys</span>
               </button>
             </div>
           </header>
 
-          <main className="flex-1 w-full max-w-5xl mx-auto py-12 px-6">
+          <main className="flex-1 w-full max-w-5xl mx-auto py-12 px-6 animate-in fade-in duration-300">
             <div className="flex justify-between items-end mb-8">
               <div>
                 <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome back</h1>
@@ -500,15 +477,31 @@ function Dashboard() {
                 <Key className="h-3.5 w-3.5" /><span>API Config</span>
               </button>
 
+              {/* Models dropdown is now updated with all requested options */}
               <select value={selectedModel} onChange={(e) => handleModelChange(e.target.value as AIModel)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs shadow-sm font-medium text-slate-700">
-                  <optgroup label="Google Gemini"><option value="gemini-2.5-flash">Gemini 2.5 Flash</option></optgroup>
-                  <optgroup label="OpenAI API Integration"><option value="gpt-4o">GPT-4o Engine</option></optgroup>
+                  <optgroup label="Google Gemini">
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                  </optgroup>
+                  <optgroup label="OpenAI">
+                    <option value="gpt-4o">ChatGPT-4o</option>
+                  </optgroup>
+                  <optgroup label="Anthropic">
+                    <option value="claude-3.7-sonnet">Claude 3.7 Sonnet</option>
+                  </optgroup>
+                  <optgroup label="Other Providers">
+                    <option value="local-llama">Local Llama</option>
+                    <option value="mistral">Mistral</option>
+                    <option value="groq">Groq</option>
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="custom">Custom API</option>
+                  </optgroup>
               </select>
             </div>
           </header>
 
           <main className="flex flex-1 overflow-hidden relative z-10">
-            {/* Sidebar Configuration */}
             <div className="w-72 border-r border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm z-10 overflow-y-auto">
               <div>
                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">System Context</h3>
@@ -560,9 +553,7 @@ function Dashboard() {
               </div>
             </div>
 
-            {/* Split Pane */}
             <div className="flex flex-1 flex-col overflow-hidden bg-white">
-              {/* Editor Top Half */}
               <div className="flex-1 min-h-[40%] border-b border-slate-100 p-4 relative flex flex-col">
                 <div className="text-xs font-semibold text-slate-500 tracking-wider uppercase mb-2 flex items-center justify-between">
                   <span>Code Sandbox</span>
@@ -584,7 +575,6 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* Chat Bottom Half */}
               <div className="h-[45%] flex flex-col bg-slate-50/70 overflow-hidden">
                 <div className="px-4 py-2 border-b border-slate-200 bg-white flex items-center justify-between text-xs font-semibold text-slate-600 shadow-sm">
                   <span className="flex items-center gap-1.5"><Bot className="h-4 w-4 text-indigo-600" /> AI Assistant Console</span>
@@ -656,10 +646,17 @@ function Dashboard() {
                 <div className="space-y-4 pt-2">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Add New Provider</h4>
                   <div className="space-y-3">
+                    {/* The API keys dropdown is also updated to mirror the expanded list */}
                     <select value={keyProvider} onChange={(e) => setKeyProvider(e.target.value as KeyProvider)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white font-medium text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20">
                       <option value="gemini">Google Gemini AI</option>
                       <option value="openai">OpenAI</option>
                       <option value="anthropic">Anthropic Claude</option>
+                      <option value="local">Local Llama</option>
+                      <option value="mistral">Mistral</option>
+                      <option value="groq">Groq</option>
+                      <option value="deepseek">DeepSeek</option>
+                      <option value="openrouter">OpenRouter</option>
+                      <option value="custom">Custom API Config</option>
                     </select>
                     <input type="password" placeholder="Paste your secret API Key..." value={inputKey} onChange={(e) => setInputKey(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
                     <input type="text" placeholder="Custom Label (e.g. My Personal Key)" value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />

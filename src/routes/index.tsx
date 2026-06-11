@@ -8,7 +8,7 @@ export const Route = createFileRoute("/")({
 });
 
 export default function LandingPage() {
-  // Generate a fresh workspace ID dynamically when they click the button
+  // Generates a unique 8-character ID for a brand-new workspace
   const freshProjectId = nanoid(8);
 
   return (
@@ -22,11 +22,11 @@ export default function LandingPage() {
             </div>
           </div>
           
-          <h1 className="mb-4 text-5xl font-extrabold tracking-tight sm:text-6xl">
+          <h1 className="mb-4 text-5xl font-extrabold tracking-tight sm:text-6xl text-slate-900">
             Vibe-code with any AI
           </h1>
           
-          <p className="mb-8 text-lg text-muted-foreground sm:text-xl">
+          <p className="mb-8 text-lg text-slate-600 sm:text-xl">
             Your ultimate Multi-AI Sandbox Dev Environment. Bring your own API keys and seamlessly switch between Gemini, Claude, OpenAI, and local models.
           </p>
           

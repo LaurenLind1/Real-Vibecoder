@@ -1,4 +1,5 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
+import "../index.css"; // <-- This is the magic line we are missing!
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -7,7 +8,6 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <>
-      {/* This Outlet acts like a portal that loads either your index page or your project page automatically depending on the URL */}
       <Outlet />
     </>
   );

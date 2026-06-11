@@ -466,4 +466,61 @@ function Dashboard() {
                       </div>
                       <div className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${msg.role === "user" ? "bg-slate-900 text-white font-medium" : "bg-white border border-slate-200 text-slate-800"}`}>
                         <p className="whitespace-pre-wrap">{msg.content}</p>
-                        <span className={`block text-[10px] mt-1 text-right text-slate-400`}>{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <span className={`block text-[10px] mt-1 text-right text-slate-400`}>{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {isGenerating && (
+                    <div className="flex gap-3 max-w-[85%] mr-auto items-center animate-pulse">
+                      <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0"><RefreshCw className="h-4 w-4 text-indigo-600 animate-spin" /></div>
+                      <div className="bg-white border border-slate-200 text-slate-400 rounded-xl px-4 py-2 text-xs font-medium italic shadow-sm">AI is calculating response...</div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-200 bg-white flex gap-2 shadow-inner">
+                  <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Ask AI to generate functions, explain issues, or build prototypes..." disabled={isGenerating} className="flex-1 h-10 px-4 rounded-lg border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 placeholder:text-slate-400" />
+                  <button type="submit" disabled={!chatInput.trim() || isGenerating} className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-lg bg-slate-900 text-white transition-colors hover:bg-slate-800 shadow-sm disabled:opacity-40"><Send className="h-4 w-4" /></button>
+                </form>
+              </div>
+            </div>
+          </main>
+        </div>
+      )}
+
+      {/* Key Panel Modal (Simplified for brevity but functionally identical) */}
+      {isKeyPanelOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[200]">
+           <div className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-2xl relative">
+              <button onClick={() => setIsKeyPanelOpen(false)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"><X className="h-5 w-5" /></button>
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><Key className="h-5 w-5 text-slate-700" /> AI Providers</h3>
+              
+              <div className="space-y-4">
+                {savedProviders.map((cred) => (
+                  <div key={cred.id} className="flex justify-between items-center p-3 border rounded-lg">
+                    <div><p className="font-semibold text-sm">{cred.label}</p><p className="text-xs text-slate-500">{cred.provider}</p></div>
+                    <div className="flex gap-2">
+                       <button onClick={() => handleInlineTestKey(cred)} className="text-xs text-blue-600">Test</button>
+                       <button onClick={() => handleDeleteCredential(cred.id)} className="text-xs text-red-600"><Trash2 className="h-4 w-4"/></button>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="border-t pt-4 space-y-3">
+                  <select value={keyProvider} onChange={(e) => setKeyProvider(e.target.value as KeyProvider)} className="w-full p-2 border rounded text-sm">
+                    <option value="gemini">Google Gemini</option>
+                    <option value="openai">OpenAI</option>
+                  </select>
+                  <input type="password" placeholder="API Key" value={inputKey} onChange={(e) => setInputKey(e.target.value)} className="w-full p-2 border rounded text-sm" />
+                  <input type="text" placeholder="Label" value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} className="w-full p-2 border rounded text-sm" />
+                  <button onClick={handleTestAndAdd} className="w-full bg-slate-900 text-white p-2 rounded text-sm hover:bg-slate-800">Add Key</button>
+                </div>
+              </div>
+           </div>
+        </div>
+      )}
+    </>
+  );
+}

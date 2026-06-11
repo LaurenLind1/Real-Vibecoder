@@ -43,9 +43,31 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+// 🗂️ New Interface for managing past projects dynamically
+interface Project {
+  id: string;
+  name: string;
+  date: Date;
+  fileCount: number;
+}
+
 function Dashboard() {
-  // 🚀 New UI State to track if we show the hero landing page or the split workspace
+  // 🚀 Landing page vs Workspace state
   const [hasChatStarted, setHasChatStarted] = useState<boolean>(false);
+
+  // 🗂️ Dynamic state for Past Projects
+  // Initialized with a sample so you can test the delete button immediately
+  const [recentProjects, setRecentProjects] = useState<Project[]>([
+    { id: "1", name: "Pomodoro Timer App", date: new Date(), fileCount: 3 }
+  ]);
+
+  // 🎛️ State for the Interactive Feature Toggles
+  const [activeFeatures, setActiveFeatures] = useState({
+    planMode: false,
+    liveTimer: false,
+    autoFix: false,
+    checkpoints: false
+  });
 
   const [selectedModel, setSelectedModel] = useState<AIModel>("gemini-2.5-flash");
   const [code, setCode] = useState<string>(
@@ -55,25 +77,17 @@ function Dashboard() {
     "You are an expert full-stack developer assistant."
   );
 
-  // 🎛️ Toggle state for the main credential popup drawer
   const [isKeyPanelOpen, setIsKeyPanelOpen] = useState<boolean>(false);
-
-  // 🧠 State for adding a new provider credential
   const [keyProvider, setKeyProvider] = useState<KeyProvider>("gemini");
   const [inputKey, setInputKey] = useState<string>("");
   const [customLabel, setCustomLabel] = useState<string>("");
 
-  // 🔒 Validation network processing animation flags
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [testingKeyId, setTestingKeyId] = useState<string | null>(null);
 
-  // 📢 Status alert banners pinned to the top right of the browser viewport
   const [notification, setNotification] = useState<BannerNotification | null>(null);
-
-  // 📋 Main database list of successfully committed user credentials
   const [savedProviders, setSavedProviders] = useState<SavedCredential[]>([]);
 
-  // 💬 Chat Interface State Management
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -86,7 +100,6 @@ function Dashboard() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-dismiss top notifications after 4 seconds
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => setNotification(null), 4000);
@@ -94,19 +107,29 @@ function Dashboard() {
     }
   }, [notification]);
 
-  // Scroll to bottom of chat when new messages arrive
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // 🗑️ Function to handle deleting a project
+  const handleDeleteProject = (projectId: string) => {
+    setRecentProjects((prev) => prev.filter((p) => p.id !== projectId));
+    setNotification({ type: "success", message: "Project deleted successfully." });
+  };
+
+  // 🎛️ Function to handle toggling features on/off
+  const toggleFeature = (feature: keyof typeof activeFeatures) => {
+    setActiveFeatures((prev) => ({
+      ...prev,
+      [feature]: !prev[feature]
+    }));
+  };
 
   const handleModelChange = (model: AIModel) => {
     setSelectedModel(model);
     setCode((prev) =>
       `// Switched engine context to: ${model}\n` +
-      prev.replace(
-        /\/\/ Selected Engine: .*\n|\/\/ Switched engine context to: .*\n/,
-        ""
-      )
+      prev.replace(/\/\/ Selected Engine: .*\n|\/\/ Switched engine context to: .*\n/, "")
     );
   };
 
@@ -219,12 +242,10 @@ function Dashboard() {
     const currentMessageText = chatInput.trim();
     setChatInput("");
 
-    // Transition to the split layout if we are coming from the home state
     if (!hasChatStarted) {
       setHasChatStarted(true);
     }
 
-    // Package user message
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -293,7 +314,6 @@ function Dashboard() {
 
   return (
     <>
-      {/* 🚨 Floating Global Status Banners positioned in the top-right corner */}
       {notification && (
         <div className="fixed top-4 right-4 z-[100] w-full max-w-sm animate-in fade-in slide-in-from-top-4 duration-200">
           <div className={`flex items-center gap-3 rounded-xl border p-4 shadow-xl text-sm font-medium ${
@@ -359,50 +379,111 @@ function Dashboard() {
 
             <div className="w-full flex flex-col gap-4">
               <h3 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-1">Your Projects</h3>
-              <div className="bg-white rounded-xl border border-slate-200 p-4 flex justify-between items-center shadow-sm cursor-pointer hover:border-slate-300 transition-colors">
-                <div>
-                  <h4 className="font-semibold text-slate-900 text-sm">Untitled project</h4>
-                  <p className="text-xs text-slate-400 mt-1">6/10/2026, 8:00:38 AM · 3 files</p>
+              
+              {/* 🗂️ Dynamic Project List mapped from state */}
+              {recentProjects.length === 0 ? (
+                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-8 text-center">
+                  <p className="text-sm text-slate-500">No past projects found. Create a new one above!</p>
                 </div>
-                <button className="text-slate-400 hover:text-slate-600 p-2 rounded-md transition-colors focus:outline-none"><Trash2 className="h-4 w-4" /></button>
-              </div>
+              ) : (
+                <div className="space-y-2">
+                  {recentProjects.map((project) => (
+                    <div key={project.id} className="bg-white rounded-xl border border-slate-200 p-4 flex justify-between items-center shadow-sm cursor-pointer hover:border-slate-300 transition-colors">
+                      <div>
+                        <h4 className="font-semibold text-slate-900 text-sm">{project.name}</h4>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {project.date.toLocaleDateString()} · {project.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {project.fileCount} files
+                        </p>
+                      </div>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevents clicking the project row
+                          handleDeleteProject(project.id);
+                        }}
+                        className="text-slate-400 hover:text-rose-500 p-2 rounded-md transition-colors focus:outline-none"
+                        title="Delete project"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-4 mt-2">
-                <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <ListTodo className="h-4 w-4 text-slate-700" />
-                    <h4 className="font-semibold text-slate-900 text-sm">Plan-first mode</h4>
+              {/* 🎛️ Interactive Feature Toggles */}
+              <div className="grid grid-cols-2 gap-4 mt-2 cursor-default">
+                
+                <div 
+                  onClick={() => toggleFeature('planMode')}
+                  className={`rounded-xl border p-5 shadow-sm cursor-pointer transition-all duration-200 ${
+                    activeFeatures.planMode ? "bg-slate-50 border-slate-900 ring-1 ring-slate-900/20" : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <ListTodo className={`h-4 w-4 ${activeFeatures.planMode ? "text-indigo-600" : "text-slate-700"}`} />
+                      <h4 className="font-semibold text-slate-900 text-sm">Plan-first mode</h4>
+                    </div>
+                    {activeFeatures.planMode && <div className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />}
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed">Toggle the planner and the AI writes a short plan before touching code.</p>
                 </div>
-                <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Timer className="h-4 w-4 text-slate-700" />
-                    <h4 className="font-semibold text-slate-900 text-sm">Live build timer</h4>
+
+                <div 
+                  onClick={() => toggleFeature('liveTimer')}
+                  className={`rounded-xl border p-5 shadow-sm cursor-pointer transition-all duration-200 ${
+                    activeFeatures.liveTimer ? "bg-slate-50 border-slate-900 ring-1 ring-slate-900/20" : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Timer className={`h-4 w-4 ${activeFeatures.liveTimer ? "text-emerald-600" : "text-slate-700"}`} />
+                      <h4 className="font-semibold text-slate-900 text-sm">Live build timer</h4>
+                    </div>
+                    {activeFeatures.liveTimer && <div className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />}
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed">Watch elapsed time and step count tick up while the agent works.</p>
                 </div>
-                <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wrench className="h-4 w-4 text-slate-700" />
-                    <h4 className="font-semibold text-slate-900 text-sm">Auto-fix preview errors</h4>
+
+                <div 
+                  onClick={() => toggleFeature('autoFix')}
+                  className={`rounded-xl border p-5 shadow-sm cursor-pointer transition-all duration-200 ${
+                    activeFeatures.autoFix ? "bg-slate-50 border-slate-900 ring-1 ring-slate-900/20" : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Wrench className={`h-4 w-4 ${activeFeatures.autoFix ? "text-amber-600" : "text-slate-700"}`} />
+                      <h4 className="font-semibold text-slate-900 text-sm">Auto-fix preview errors</h4>
+                    </div>
+                    {activeFeatures.autoFix && <div className="h-2 w-2 rounded-full bg-amber-600 animate-pulse" />}
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed">When the sandbox throws, one click sends the error back to the model.</p>
                 </div>
-                <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <RotateCcw className="h-4 w-4 text-slate-700" />
-                    <h4 className="font-semibold text-slate-900 text-sm">Checkpoints & revert</h4>
+
+                <div 
+                  onClick={() => toggleFeature('checkpoints')}
+                  className={`rounded-xl border p-5 shadow-sm cursor-pointer transition-all duration-200 ${
+                    activeFeatures.checkpoints ? "bg-slate-50 border-slate-900 ring-1 ring-slate-900/20" : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <RotateCcw className={`h-4 w-4 ${activeFeatures.checkpoints ? "text-sky-600" : "text-slate-700"}`} />
+                      <h4 className="font-semibold text-slate-900 text-sm">Checkpoints & revert</h4>
+                    </div>
+                    {activeFeatures.checkpoints && <div className="h-2 w-2 rounded-full bg-sky-600 animate-pulse" />}
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed">Every turn snapshots your files. Roll back any time from the History menu.</p>
                 </div>
+
               </div>
             </div>
           </main>
         </div>
       ) : (
 
-        /* 🔵 LAYOUT 2: The IDE Split-Pane View (Triggered once you type a prompt and press New Project) */
+        /* 🔵 LAYOUT 2: The IDE Split-Pane View */
         <div className="flex h-screen flex-col overflow-hidden text-slate-900 relative bg-slate-50 animate-in fade-in zoom-in-95 duration-300">
           <header className="flex h-14 items-center justify-between border-b bg-white px-6 relative z-40 shadow-sm">
             <div className="flex items-center gap-2 font-semibold">
@@ -583,7 +664,7 @@ function Dashboard() {
         </div>
       )}
 
-      {/* 📋 Centered Multi-Provider Modal Panel Overlay (Accessible from both layouts!) */}
+      {/* 📋 Centered Multi-Provider Modal Panel Overlay */}
       {isKeyPanelOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[200] animate-in fade-in duration-150">
           <div className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150 relative">
@@ -600,7 +681,7 @@ function Dashboard() {
                 <Key className="h-5 w-5 text-slate-700" /> AI Providers
               </h3>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Add API keys for any AI provider. Keys are stored only in this browser's localStorage and sent directly to the provider — never to a VibeCoder server.
+                Add API keys for any AI provider. Keys are stored only in this browser's localStorage and sent directly to the provider.
               </p>
             </div>
             

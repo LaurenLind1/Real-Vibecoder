@@ -3,14 +3,14 @@ import { useState, useEffect, useRef } from "react";
 import Editor from "@monaco-editor/react";
 import { 
   Key, X, Trash2, CheckCircle2, AlertTriangle, RefreshCw, 
-  Send, Bot, User, Sparkles, Plus, ListTodo, Timer, Wrench, RotateCcw, Play, Home, ArrowRight, Code2
+  Send, Bot, User, Sparkles, Plus, ListTodo, Timer, Wrench, RotateCcw, Play, Home, ArrowRight
 } from "lucide-react";
 
 export const Route = createFileRoute("/p/$projectId")({
   component: Dashboard,
 });
 
-type PageView = "landing" | "home" | "chatbox";
+type PageView = "home" | "chatbox";
 
 type AIModel =
   | "gemini-2.5-flash"
@@ -53,7 +53,8 @@ interface Project {
 }
 
 function Dashboard() {
-  const [currentPage, setCurrentPage] = useState<PageView>("landing");
+  // Start directly on the home dashboard page
+  const [currentPage, setCurrentPage] = useState<PageView>("home");
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
 
   const [activeFeatures, setActiveFeatures] = useState({
@@ -234,7 +235,7 @@ function Dashboard() {
     if (!activeCredential) {
       setTimeout(() => {
         setMessages((prev) => [...prev, {
-          id: crypto.randomUUID(), role: "assistant", content: `⚠️ No active key found for "${primaryTargetProvider}". Please use the "API Config" button to get connected.`, timestamp: new Date()
+          id: crypto.randomUUID(), role: "assistant", content: `⚠️ No active key found for "${primaryTargetProvider}". Please use the "API Keys" button to get connected.`, timestamp: new Date()
         }]);
         setIsGenerating(false);
       }, 800);
@@ -296,80 +297,21 @@ function Dashboard() {
         </div>
       )}
 
-      {/* 🚀 PAGE ONE: LANDING PAGE */}
-      {currentPage === "landing" && (
-        <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans justify-between relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.08),transparent_45%)]" />
-          
-          <header className="flex h-20 items-center justify-between px-10 w-full border-b border-slate-200 relative z-10 backdrop-blur-md bg-white/60">
-            <div className="flex items-center gap-2.5 font-black text-xl tracking-tight">
-              <Sparkles className="h-6 w-6 text-indigo-600" />
-              <span>VibeCoder</span>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setCurrentPage("home")}
-                className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
-              >
-                Dashboard
-              </button>
-              <button 
-                onClick={() => setIsKeyPanelOpen(true)} 
-                className="flex items-center gap-2.5 text-sm font-bold bg-slate-900 text-white px-6 py-3 rounded-xl transition-all hover:bg-slate-800 shadow-sm hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <Key className="h-4 w-4" />
-                <span>API Keys</span>
-              </button>
-            </div>
-          </header>
-
-          <main className="flex-1 flex flex-col items-center justify-center text-center px-6 max-w-3xl mx-auto relative z-10 py-16">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-slate-200 text-xs text-slate-600 font-medium mb-6 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" /> Next-Gen AI Sandbox Engine
-            </div>
-            <h1 className="text-5xl md:text-6xl font-black tracking-tight text-slate-900 mb-6 leading-[1.1]">
-              Vibe-code apps with <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-sky-500 to-emerald-500">any LLM model</span>.
-            </h1>
-            <p className="text-slate-500 text-lg md:text-xl max-w-2xl mb-10 leading-relaxed">
-              Bring your own API keys. Prompt, blueprint, iterate, and monitor your sandbox build steps in real-time. Completely client-side and sandboxed.
-            </p>
-
-            <button 
-              onClick={() => setCurrentPage("home")} 
-              className="bg-indigo-600 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors shadow-md text-lg hover:-translate-y-0.5"
-            >
-              Enter Dashboard <ArrowRight className="h-5 w-5" />
-            </button>
-            
-            {savedProviders.length === 0 && (
-               <div className="mt-6 flex items-center gap-2 text-slate-500 text-sm font-medium">
-                 <AlertTriangle className="h-4 w-4 text-amber-500" /> You will need to add an API key inside to build.
-               </div>
-            )}
-          </main>
-          
-          <footer className="py-6 text-center text-slate-400 text-sm relative z-10 font-medium">
-            Powered by standard multi-provider endpoints. Keys are stored locally.
-          </footer>
-        </div>
-      )}
-
-      {/* 🏠 PAGE TWO: HOME DASHBOARD */}
+      {/* 🏠 PAGE ONE: HOME DASHBOARD */}
       {currentPage === "home" && (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-          <header className="flex h-16 items-center justify-between px-8 w-full">
-            <div className="flex items-center gap-2 font-bold text-lg text-slate-900 cursor-pointer" onClick={() => setCurrentPage("landing")}>
-              <Sparkles className="h-5 w-5 text-indigo-600" />
+          <header className="flex h-20 items-center justify-between px-8 w-full border-b border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center gap-2 font-black text-xl tracking-tight text-slate-900">
+              <Sparkles className="h-6 w-6 text-indigo-600" />
               <span>VibeCoder</span>
             </div>
             
             <button 
               onClick={() => setIsKeyPanelOpen(true)} 
-              className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+              className="flex items-center gap-2 text-sm font-bold text-white bg-gradient-to-r from-indigo-600 via-sky-500 to-emerald-500 px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg hover:opacity-90 transition-all hover:-translate-y-0.5"
             >
               <Key className="h-4 w-4" />
-              <span>AI Providers</span>
+              <span>API Providers</span>
             </button>
           </header>
 
@@ -403,12 +345,9 @@ function Dashboard() {
             <div className="mb-12">
               <h3 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-4">Your Projects</h3>
               {recentProjects.length === 0 ? (
-                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center justify-between opacity-60">
-                  <div>
-                    <h4 className="font-semibold text-slate-900">Untitled project</h4>
-                    <p className="text-xs text-slate-500 mt-1.5">{new Date().toLocaleDateString()} · 0 files</p>
-                  </div>
-                  <button className="text-slate-400 p-2"><Trash2 className="h-4 w-4" /></button>
+                <div className="border border-dashed border-slate-300 bg-white/50 rounded-xl p-8 text-center flex flex-col items-center justify-center gap-2">
+                  <p className="text-slate-500 text-sm font-medium">No projects yet.</p>
+                  <p className="text-slate-400 text-xs">Start a new project above, and it will be saved here automatically.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -464,7 +403,7 @@ function Dashboard() {
         </div>
       )}
 
-      {/* 💻 PAGE THREE: CHATBOX WORKSPACE */}
+      {/* 💻 PAGE TWO: CHATBOX WORKSPACE */}
       {currentPage === "chatbox" && (
         <div className="flex h-screen flex-col overflow-hidden text-slate-900 relative bg-slate-50 animate-in fade-in duration-300">
           <header className="flex h-14 items-center justify-between border-b bg-white px-6 relative z-40 shadow-sm">

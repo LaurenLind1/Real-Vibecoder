@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Editor from "@monaco-editor/react";
-import { Key, X, Trash2 } from "lucide-react";
+import { Key, X, Trash2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
 
 export const Route = createFileRoute("/p/$projectId")({
   component: Dashboard,
@@ -28,6 +28,11 @@ interface SavedCredential {
   key: string;
 }
 
+interface BannerNotification {
+  type: "success" | "error";
+  message: string;
+}
+
 function Dashboard() {
   const [selectedModel, setSelectedModel] = useState<AIModel>("gemini-2.5-flash");
   const [code, setCode] = useState<string>(
@@ -45,8 +50,22 @@ function Dashboard() {
   const [inputKey, setInputKey] = useState<string>("");
   const [customLabel, setCustomLabel] = useState<string>("");
 
+  // 🔒 Validation network processing animation flags
+  const [isTesting, setIsTesting] = useState<boolean>(false);
+
+  // 📢 Status alert banners pinned to the browser ceiling
+  const [notification, setNotification] = useState<BannerNotification | null>(null);
+
   // 📋 Main database list of successfully committed user credentials
   const [savedProviders, setSavedProviders] = useState<SavedCredential[]>([]);
+
+  // Auto-dismiss top notifications after 4 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   const handleModelChange = (model: AIModel) => {
     setSelectedModel(model);
@@ -59,36 +78,91 @@ function Dashboard() {
     );
   };
 
-  // Logic to process, bundle and commit credentials into memory storage
-  const handleAddCredential = () => {
-    if (!inputKey.trim()) return;
+  // Direct asynchronous lookup to check credentials before committing
+  const runKeyValidationProbe = async (provider: KeyProvider, secretKey: string): Promise<boolean> => {
+    try {
+      if (provider === "gemini") {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${secretKey}`);
+        return res.status === 200;
+      }
+      if (provider === "openai") {
+        const res = await fetch("https://api.openai.com/v1/models", {
+          headers: { Authorization: `Bearer ${secretKey}` }
+        });
+        return res.status === 200;
+      }
+      if (provider === "anthropic") {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "x-api-key": secretKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+          body: JSON.stringify({ model: "claude-3-haiku-20240307", max_tokens: 1, messages: [{ role: "user", content: "ping" }] })
+        });
+        return res.status !== 401 && res.status !== 403;
+      }
+      if (provider === "local") {
+        const res = await fetch(secretKey || "http://localhost:11434");
+        return res.ok;
+      }
+      // General handler fallback for standardized providers (Mistral, Groq, DeepSeek, OpenRouter)
+      const baseUrlMap: Record<string, string> = {
+        mistral: "https://api.mistral.ai/v1/models",
+        groq: "https://api.groq.com/openai/v1/models",
+        deepseek: "https://api.deepseek.com/v1/models",
+        openrouter: "https://openrouter.ai/api/v1/models",
+        custom: secretKey.startsWith("http") ? secretKey : ""
+      };
+      
+      const targetUrl = baseUrlMap[provider];
+      if (!targetUrl) return true; // Accept custom fields seamlessly
 
-    const providerNames: Record<KeyProvider, string> = {
-      gemini: "Google Gemini",
-      openai: "OpenAI",
-      anthropic: "Anthropic Claude",
-      local: "Local Endpoints",
-      mistral: "Mistral",
-      groq: "Groq",
-      deepseek: "DeepSeek",
-      openrouter: "OpenRouter",
-      custom: "Custom Integration",
-    };
+      const res = await fetch(targetUrl, {
+        headers: { Authorization: `Bearer ${secretKey}` }
+      });
+      return res.status === 200;
+    } catch {
+      return false;
+    }
+  };
 
-    const finalLabel = customLabel.trim() || `${providerNames[keyProvider]} Key`;
+  const handleTestAndAdd = async () => {
+    if (!inputKey.trim()) {
+      setNotification({ type: "error", message: "Please insert an API key string before attempting a test." });
+      return;
+    }
 
-    const newCred: SavedCredential = {
-      id: crypto.randomUUID(),
-      provider: keyProvider,
-      label: finalLabel,
-      key: inputKey,
-    };
+    setIsTesting(true);
+    const isValid = await runKeyValidationProbe(keyProvider, inputKey.trim());
+    setIsTesting(false);
 
-    setSavedProviders((prev) => [...prev, newCred]);
-    
-    // Clear input fields for clean user re-use
-    setInputKey("");
-    setCustomLabel("");
+    if (isValid) {
+      const providerNames: Record<KeyProvider, string> = {
+        gemini: "Google Gemini",
+        openai: "OpenAI",
+        anthropic: "Anthropic Claude",
+        local: "Local Endpoints",
+        mistral: "Mistral",
+        groq: "Groq",
+        deepseek: "DeepSeek",
+        openrouter: "OpenRouter",
+        custom: "Custom Integration",
+      };
+
+      const finalLabel = customLabel.trim() || `${providerNames[keyProvider]} Key`;
+      const newCred: SavedCredential = {
+        id: crypto.randomUUID(),
+        provider: keyProvider,
+        label: finalLabel,
+        key: inputKey.trim(),
+      };
+
+      setSavedProviders((prev) => [...prev, newCred]);
+      setNotification({ type: "success", message: `Success! ${finalLabel} verified and added perfectly.` });
+      
+      setInputKey("");
+      setCustomLabel("");
+    } else {
+      setNotification({ type: "error", message: "The key is not working. Check permissions or formatting and try again." });
+    }
   };
 
   const handleDeleteCredential = (id: string) => {
@@ -97,6 +171,28 @@ function Dashboard() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden text-slate-900 relative">
+      
+      {/* 🚨 Floating Global Status Banners */}
+      {notification && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4 animate-in fade-in slide-in-from-top-4 duration-200">
+          <div className={`flex items-center gap-3 rounded-lg border p-4 shadow-xl text-sm font-medium ${
+            notification.type === "success" 
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800" 
+              : "bg-rose-50 border-rose-200 text-rose-800"
+          }`}>
+            {notification.type === "success" ? (
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0" />
+            )}
+            <span className="flex-1 leading-snug">{notification.message}</span>
+            <button onClick={() => setNotification(null)} className="text-current opacity-60 hover:opacity-100 transition-opacity">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Navigation Control Bar */}
       <header className="flex h-14 items-center justify-between border-b bg-card px-6 relative z-40">
         <div className="flex items-center gap-2 font-semibold">
@@ -129,7 +225,6 @@ function Dashboard() {
               onChange={(e) => handleModelChange(e.target.value as AIModel)}
               className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
             >
-              {/* Dynamic Group generated directly from keys added by user */}
               {savedProviders.length > 0 && (
                 <optgroup label="Your Activated Custom Key Routes">
                   {savedProviders.map((cred) => (
@@ -208,7 +303,6 @@ function Dashboard() {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-150">
           <div className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150 relative">
             
-            {/* Close button top right */}
             <button 
               onClick={() => setIsKeyPanelOpen(false)}
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 rounded-md p-1 transition-colors focus:outline-none"
@@ -226,7 +320,7 @@ function Dashboard() {
               </p>
             </div>
             
-            {/* Displaying Live Configured Active Keys */}
+            {/* Active Credentials Summary Block */}
             <div className="space-y-2 mb-4">
               {savedProviders.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 bg-slate-50/50">
@@ -257,7 +351,7 @@ function Dashboard() {
             </div>
 
             <div className="space-y-4 border-t border-slate-100 pt-4">
-              {/* Select Provider block */}
+              {/* Select Provider Block */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-slate-700">
                   Add a provider
@@ -279,14 +373,14 @@ function Dashboard() {
                 </select>
               </div>
 
-              {/* Dynamic Secret Key Input block */}
+              {/* API Secret Key Field */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-slate-700">
                   Get a key ↗
                 </label>
                 <input
                   type="password"
-                  placeholder={keyProvider === "local" ? "http://localhost:11434" : "Starts with AIza..."}
+                  placeholder={keyProvider === "local" ? "http://localhost:11434" : "Paste credentials here..."}
                   value={inputKey}
                   onChange={(e) => setInputKey(e.target.value)}
                   className="h-10 w-full rounded-lg border border-slate-200 bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 text-slate-900"
@@ -296,23 +390,31 @@ function Dashboard() {
               {/* Option Label Field */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-slate-700">
-                  Label (optional)
+                  Label / Name
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. My Production Environment Key"
+                  placeholder="e.g. My Primary Workspace Key"
                   value={customLabel}
                   onChange={(e) => setCustomLabel(e.target.value)}
                   className="h-10 w-full rounded-lg border border-slate-200 bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 text-slate-900"
                 />
               </div>
 
-              {/* Action Button */}
+              {/* Action Validation Trigger Button */}
               <button 
-                onClick={handleAddCredential}
-                className="w-full h-10 mt-2 inline-flex items-center justify-center rounded-lg bg-slate-900 text-white font-medium text-sm transition-colors hover:bg-slate-800"
+                onClick={handleTestAndAdd}
+                disabled={isTesting}
+                className="w-full h-10 mt-2 inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 text-white font-medium text-sm transition-colors hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                + Add
+                {isTesting ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Verifying Credentials...</span>
+                  </>
+                ) : (
+                  <span>+ Test Key & Add</span>
+                )}
               </button>
             </div>
           </div>

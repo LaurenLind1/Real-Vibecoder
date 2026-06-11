@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import Editor from "@monaco-editor/react";
-import { Key, X } from "lucide-react";
+import { Key, X, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/p/$projectId")({
   component: Dashboard,
@@ -19,8 +19,14 @@ type AIModel =
   | "openrouter"
   | "custom";
 
-// Type definition for separate API key fields including your new options
 type KeyProvider = "gemini" | "openai" | "anthropic" | "local" | "mistral" | "groq" | "deepseek" | "openrouter" | "custom";
+
+interface SavedCredential {
+  id: string;
+  provider: KeyProvider;
+  label: string;
+  key: string;
+}
 
 function Dashboard() {
   const [selectedModel, setSelectedModel] = useState<AIModel>("gemini-2.5-flash");
@@ -34,19 +40,13 @@ function Dashboard() {
   // 🎛️ Toggle state for the main credential popup drawer
   const [isKeyPanelOpen, setIsKeyPanelOpen] = useState<boolean>(false);
 
-  // 🧠 State holding individual API keys for separate platform managers
+  // 🧠 State for adding a new provider credential
   const [keyProvider, setKeyProvider] = useState<KeyProvider>("gemini");
-  const [apiKeys, setApiKeys] = useState<{ [key in KeyProvider]: string }>({
-    gemini: "",
-    openai: "",
-    anthropic: "",
-    local: "",
-    mistral: "",
-    groq: "",
-    deepseek: "",
-    openrouter: "",
-    custom: "",
-  });
+  const [inputKey, setInputKey] = useState<string>("");
+  const [customLabel, setCustomLabel] = useState<string>("");
+
+  // 📋 Main database list of successfully committed user credentials
+  const [savedProviders, setSavedProviders] = useState<SavedCredential[]>([]);
 
   const handleModelChange = (model: AIModel) => {
     setSelectedModel(model);
@@ -59,12 +59,40 @@ function Dashboard() {
     );
   };
 
-  // Helper helper to adjust the active target key string
-  const handleKeyChange = (value: string) => {
-    setApiKeys((prev) => ({
-      ...prev,
-      [keyProvider]: value,
-    }));
+  // Logic to process, bundle and commit credentials into memory storage
+  const handleAddCredential = () => {
+    if (!inputKey.trim()) return;
+
+    const providerNames: Record<KeyProvider, string> = {
+      gemini: "Google Gemini",
+      openai: "OpenAI",
+      anthropic: "Anthropic Claude",
+      local: "Local Endpoints",
+      mistral: "Mistral",
+      groq: "Groq",
+      deepseek: "DeepSeek",
+      openrouter: "OpenRouter",
+      custom: "Custom Integration",
+    };
+
+    const finalLabel = customLabel.trim() || `${providerNames[keyProvider]} Key`;
+
+    const newCred: SavedCredential = {
+      id: crypto.randomUUID(),
+      provider: keyProvider,
+      label: finalLabel,
+      key: inputKey,
+    };
+
+    setSavedProviders((prev) => [...prev, newCred]);
+    
+    // Clear input fields for clean user re-use
+    setInputKey("");
+    setCustomLabel("");
+  };
+
+  const handleDeleteCredential = (id: string) => {
+    setSavedProviders((prev) => prev.filter((item) => item.id !== id));
   };
 
   return (
@@ -83,7 +111,7 @@ function Dashboard() {
             <button
               onClick={() => setIsKeyPanelOpen(!isKeyPanelOpen)}
               className={`inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium shadow-sm transition-colors focus:outline-none ${
-                isKeyPanelOpen || Object.values(apiKeys).some(k => k !== "")
+                isKeyPanelOpen || savedProviders.length > 0
                   ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800" 
                   : "bg-background text-foreground border-input hover:bg-muted"
               }`}
@@ -101,6 +129,17 @@ function Dashboard() {
               onChange={(e) => handleModelChange(e.target.value as AIModel)}
               className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
             >
+              {/* Dynamic Group generated directly from keys added by user */}
+              {savedProviders.length > 0 && (
+                <optgroup label="Your Activated Custom Key Routes">
+                  {savedProviders.map((cred) => (
+                    <option key={cred.id} value={cred.provider}>
+                      {cred.label} ({cred.provider})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+
               <optgroup label="Google Gemini (Native SDK)">
                 <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                 <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
@@ -167,7 +206,7 @@ function Dashboard() {
       {/* 📋 Centered Multi-Provider Modal Panel Overlay */}
       {isKeyPanelOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-150">
-          <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150 relative">
+          <div className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150 relative">
             
             {/* Close button top right */}
             <button 
@@ -187,7 +226,37 @@ function Dashboard() {
               </p>
             </div>
             
-            <div className="space-y-5 border-t border-slate-100 pt-4">
+            {/* Displaying Live Configured Active Keys */}
+            <div className="space-y-2 mb-4">
+              {savedProviders.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 bg-slate-50/50">
+                  No providers yet. Add your first one below.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <span className="text-xs font-semibold text-slate-700 block mb-1">Active Credentials</span>
+                  {savedProviders.map((cred) => (
+                    <div key={cred.id} className="flex items-center justify-between rounded-lg border border-slate-100 p-3 bg-slate-50/50 text-xs">
+                      <div>
+                        <div className="font-semibold text-slate-800 flex items-center gap-2">
+                          {cred.label}
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-normal uppercase bg-slate-200 text-slate-700">{cred.provider}</span>
+                        </div>
+                        <div className="text-slate-400 font-mono mt-0.5">••••••••••••{cred.key.slice(-4) || "Key"}</div>
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteCredential(cred.id)}
+                        className="text-slate-400 hover:text-red-500 p-1 rounded-md transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 border-t border-slate-100 pt-4">
               {/* Select Provider block */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-slate-700">
@@ -210,25 +279,37 @@ function Dashboard() {
                 </select>
               </div>
 
-              {/* Secret Key Input block */}
+              {/* Dynamic Secret Key Input block */}
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Get a key ↗
-                  </label>
-                </div>
+                <label className="text-xs font-semibold text-slate-700">
+                  Get a key ↗
+                </label>
                 <input
                   type="password"
                   placeholder={keyProvider === "local" ? "http://localhost:11434" : "Starts with AIza..."}
-                  value={apiKeys[keyProvider]}
-                  onChange={(e) => handleKeyChange(e.target.value)}
+                  value={inputKey}
+                  onChange={(e) => setInputKey(e.target.value)}
                   className="h-10 w-full rounded-lg border border-slate-200 bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 text-slate-900"
                 />
               </div>
 
-              {/* Action Button layout row mimicking image structure */}
+              {/* Option Label Field */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Label (optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. My Production Environment Key"
+                  value={customLabel}
+                  onChange={(e) => setCustomLabel(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 text-slate-900"
+                />
+              </div>
+
+              {/* Action Button */}
               <button 
-                onClick={() => setIsKeyPanelOpen(false)}
+                onClick={handleAddCredential}
                 className="w-full h-10 mt-2 inline-flex items-center justify-center rounded-lg bg-slate-900 text-white font-medium text-sm transition-colors hover:bg-slate-800"
               >
                 + Add

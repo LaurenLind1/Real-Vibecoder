@@ -22,6 +22,9 @@ function Dashboard() {
     "You are an expert full-stack developer assistant."
   );
 
+  // 🔑 Added state to store your API key safely without altering app mechanics
+  const [apiKey, setApiKey] = useState<string>("");
+
   const handleModelChange = (model: AIModel) => {
     setSelectedModel(model);
     setCode((prev) =>
@@ -34,11 +37,22 @@ function Dashboard() {
   };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-screen flex-col overflow-hidden text-slate-900">
       {/* Top Navigation Control Bar */}
       <header className="flex h-14 items-center justify-between border-b bg-card px-6">
         <div className="flex items-center gap-2 font-semibold">
           <span className="text-primary text-lg">⚙️ Multi-AI Sandbox Dev Environment</span>
+        </div>
+
+        {/* 🔑 API Key Secure Input Field added directly into header flow */}
+        <div className="flex-1 max-w-md mx-6">
+          <input
+            type="password"
+            placeholder="Enter your API Key here..."
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring text-slate-900"
+          />
         </div>
 
         {/* State-Driven Model Picker */}

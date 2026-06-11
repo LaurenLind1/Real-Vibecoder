@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import Editor from "@monaco-editor/react";
-import { Key, X } from "lucide-react"; // Icons for the key trigger and close button
+import { Key, X } from "lucide-react";
 
 export const Route = createFileRoute("/p/$projectId")({
   component: Dashboard,
@@ -14,6 +14,9 @@ type AIModel =
   | "claude-3.7-sonnet"
   | "local-llama";
 
+// Type definition for separate API key fields
+type KeyProvider = "gemini" | "openai" | "anthropic" | "local";
+
 function Dashboard() {
   const [selectedModel, setSelectedModel] = useState<AIModel>("gemini-2.5-flash");
   const [code, setCode] = useState<string>(
@@ -23,11 +26,17 @@ function Dashboard() {
     "You are an expert full-stack developer assistant."
   );
 
-  // 🔑 Key Storage State
-  const [apiKey, setApiKey] = useState<string>("");
-  
-  // 🎛️ Panel visibility control state
+  // 🎛️ Toggle state for the main credential popup drawer
   const [isKeyPanelOpen, setIsKeyPanelOpen] = useState<boolean>(false);
+
+  // 🧠 State holding individual API keys for separate platform managers
+  const [keyProvider, setKeyProvider] = useState<KeyProvider>("gemini");
+  const [apiKeys, setApiKeys] = useState<{ [key in KeyProvider]: string }>({
+    gemini: "",
+    openai: "",
+    anthropic: "",
+    local: "",
+  });
 
   const handleModelChange = (model: AIModel) => {
     setSelectedModel(model);
@@ -38,6 +47,14 @@ function Dashboard() {
         ""
       )
     );
+  };
+
+  // Helper helper to adjust the active target key string
+  const handleKeyChange = (value: string) => {
+    setApiKeys((prev) => ({
+      ...prev,
+      [keyProvider]: value,
+    }));
   };
 
   return (
@@ -51,26 +68,26 @@ function Dashboard() {
         {/* Action Controls & Interactive Model/Key Tools */}
         <div className="flex items-center gap-4 relative">
           
-          {/* 🔑 Trigger Button & Popover Container */}
+          {/* 🔑 Interactive Panel Control Interface */}
           <div className="relative">
             <button
               onClick={() => setIsKeyPanelOpen(!isKeyPanelOpen)}
-              className={`inline-flex h-9 w-9 items-center justify-center rounded-md border shadow-sm transition-colors focus:outline-none ${
-                isKeyPanelOpen || apiKey 
+              className={`inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium shadow-sm transition-colors focus:outline-none ${
+                isKeyPanelOpen || Object.values(apiKeys).some(k => k !== "")
                   ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800" 
                   : "bg-background text-foreground border-input hover:bg-muted"
               }`}
-              title="Configure API Keys"
             >
               <Key className="h-4 w-4" />
+              <span>API Keys</span>
             </button>
 
-            {/* 📋 Settings Panel Box (Matches screenshots 2, 3, & 4) */}
+            {/* 📋 Multi-Provider Key Input Dropdown Drawer */}
             {isKeyPanelOpen && (
               <div className="absolute right-0 mt-2 w-80 rounded-lg border border-input bg-white p-4 shadow-xl z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                 <div className="flex items-center justify-between mb-3 border-b pb-2">
                   <h4 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">
-                    <Key className="h-3.5 w-3.5 text-muted-foreground" /> LLM Provider Credentials
+                    <Key className="h-3.5 w-3.5 text-muted-foreground" /> Credential Manager
                   </h4>
                   <button 
                     onClick={() => setIsKeyPanelOpen(false)}
@@ -81,19 +98,39 @@ function Dashboard() {
                 </div>
                 
                 <div className="space-y-3">
+                  {/* Dropdown Selector for target engines */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-medium text-slate-500">
-                      Secret Provider API Key
+                      Select Target Provider
+                    </label>
+                    <select
+                      value={keyProvider}
+                      onChange={(e) => setKeyProvider(e.target.value as KeyProvider)}
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="gemini">Google Gemini Key</option>
+                      <option value="openai">OpenAI API Key</option>
+                      <option value="anthropic">Anthropic Claude Key</option>
+                      <option value="local">Local Host URL Endpoint</option>
+                    </select>
+                  </div>
+
+                  {/* Context-driven dynamic secret target input field */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-500 capitalize">
+                      {keyProvider} Secret Key
                     </label>
                     <input
                       type="password"
-                      placeholder="sk-..."
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder={keyProvider === "local" ? "http://localhost:11434" : "Paste credentials here..."}
+                      value={apiKeys[keyProvider]}
+                      onChange={(e) => handleKeyChange(e.target.value)}
                       className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring text-slate-900"
                     />
                   </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+
+                  {/* Bulletproof Security Notice Context text block */}
+                  <p className="text-[11px] text-muted-foreground leading-relaxed pt-1 border-t border-slate-100">
                     Keys are safely compiled in memory and sent directly to native client API targets. They are never retained on our cloud origin servers.
                   </p>
                 </div>
@@ -154,30 +191,4 @@ function Dashboard() {
 
         {/* Right Code Canvas */}
         <div className="flex flex-1 flex-col bg-background">
-          <div className="flex items-center justify-between border-b px-4 py-2 bg-muted/20">
-            <span className="text-xs font-mono font-medium text-muted-foreground">
-              Workspace Source Code
-            </span>
-            <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-400">
-              {selectedModel.includes("gemini") ? "Native Direct Hook" : "Proxy Framework"}
-            </span>
-          </div>
-          <div className="flex-1">
-            <Editor
-              height="100%"
-              defaultLanguage="typescript"
-              theme="vs-dark"
-              value={code}
-              onChange={(value) => setCode(value || "")}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 14,
-                automaticLayout: true,
-              }}
-            />
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
+          <div className="flex items-center justify-between border-b px-4 py-2 bg-

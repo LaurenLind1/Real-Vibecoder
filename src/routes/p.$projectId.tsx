@@ -95,9 +95,9 @@ function Dashboard() {
             {/* 📋 Multi-Provider Key Input Dropdown Drawer */}
             {isKeyPanelOpen && (
               <div className="absolute right-0 mt-2 w-80 rounded-lg border border-input bg-white p-4 shadow-xl z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-                <div className="flex items-center justify-between mb-3 border-b pb-2">
+                <div className="flex items-center justify-between mb-4 border-b pb-2">
                   <h4 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">
-                    <Key className="h-3.5 w-3.5 text-muted-foreground" /> Credential Manager
+                    <Key className="h-3.5 w-3.5 text-muted-foreground" /> LLM Credentials
                   </h4>
                   <button 
                     onClick={() => setIsKeyPanelOpen(false)}
@@ -107,45 +107,47 @@ function Dashboard() {
                   </button>
                 </div>
                 
-                <div className="space-y-3">
-                  {/* Dropdown Selector for target engines */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-slate-500">
-                      Select Target Provider
+                <div className="space-y-4">
+                  {/* Select Provider Grid Row */}
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <label className="text-xs font-medium text-slate-600">
+                      Provider
                     </label>
                     <select
                       value={keyProvider}
                       onChange={(e) => setKeyProvider(e.target.value as KeyProvider)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="col-span-2 h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                     >
-                      <option value="gemini">Google Gemini Key</option>
-                      <option value="openai">OpenAI API Key</option>
-                      <option value="anthropic">Anthropic Claude Key</option>
-                      <option value="local">Local Host URL Endpoint</option>
-                      <option value="mistral">Mistral AI Key</option>
-                      <option value="groq">Groq API Key</option>
-                      <option value="deepseek">DeepSeek API Key</option>
-                      <option value="openrouter">OpenRouter API Key</option>
-                      <option value="custom">Custom Configuration Endpoint</option>
+                      <option value="gemini">Google Gemini</option>
+                      <option value="openai">OpenAI API</option>
+                      <option value="anthropic">Anthropic Claude</option>
+                      <option value="local">Local Endpoints</option>
+                      <option value="mistral">Mistral AI</option>
+                      <option value="groq">Groq API</option>
+                      <option value="deepseek">DeepSeek API</option>
+                      <option value="openrouter">OpenRouter API</option>
+                      <option value="custom">Custom Endpoint</option>
                     </select>
                   </div>
 
-                  {/* Context-driven dynamic secret target input field */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-slate-500 capitalize">
-                      {keyProvider} Secret Key
+                  {/* Dynamic Secret Key Grid Row */}
+                  <div className="grid grid-cols-3 items-center gap-4">
+                    <label className="text-xs font-medium text-slate-600 capitalize">
+                      API Key
                     </label>
-                    <input
-                      type="password"
-                      placeholder={keyProvider === "local" ? "http://localhost:11434" : "Paste credentials here..."}
-                      value={apiKeys[keyProvider]}
-                      onChange={(e) => handleKeyChange(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring text-slate-900"
-                    />
+                    <div className="col-span-2">
+                      <input
+                        type="password"
+                        placeholder={keyProvider === "local" ? "http://localhost:11434" : "sk-..."}
+                        value={apiKeys[keyProvider]}
+                        onChange={(e) => handleKeyChange(e.target.value)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring text-slate-900"
+                      />
+                    </div>
                   </div>
 
                   {/* Bulletproof Security Notice Context text block */}
-                  <p className="text-[11px] text-muted-foreground leading-relaxed pt-1 border-t border-slate-100">
+                  <p className="text-[10px] text-muted-foreground leading-relaxed pt-2 border-t border-slate-100">
                     Keys are safely compiled in memory and sent directly to native client API targets. They are never retained on our cloud origin servers.
                   </p>
                 </div>

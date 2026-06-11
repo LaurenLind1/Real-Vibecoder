@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import Editor from "@monaco-editor/react";
-import { Key, X, Trash2, CheckCircle2, AlertTriangle, RefreshCw, Send, Bot, User, Sparkles } from "lucide-react";
+import { 
+  Key, X, Trash2, CheckCircle2, AlertTriangle, RefreshCw, 
+  Send, Bot, User, Sparkles, Plus, ListTodo, Timer, Wrench, RotateCcw 
+} from "lucide-react";
 
 export const Route = createFileRoute("/p/$projectId")({
   component: Dashboard,
@@ -41,6 +44,9 @@ interface ChatMessage {
 }
 
 function Dashboard() {
+  // 🚀 New UI State to track if we show the hero landing page or the split workspace
+  const [hasChatStarted, setHasChatStarted] = useState<boolean>(false);
+
   const [selectedModel, setSelectedModel] = useState<AIModel>("gemini-2.5-flash");
   const [code, setCode] = useState<string>(
     `// Selected Engine: ${selectedModel}\nfunction init() {\n  console.log("Hello from your sandbox workspace!");\n}`
@@ -206,13 +212,17 @@ function Dashboard() {
     setSavedProviders((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // 🔥 Main chat engine execution loop hooking dynamic client keys directly into live endpoints
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!chatInput.trim() || isGenerating) return;
 
     const currentMessageText = chatInput.trim();
     setChatInput("");
+
+    // Transition to the split layout if we are coming from the home state
+    if (!hasChatStarted) {
+      setHasChatStarted(true);
+    }
 
     // Package user message
     const userMsg: ChatMessage = {
@@ -225,8 +235,6 @@ function Dashboard() {
     setMessages((prev) => [...prev, userMsg]);
     setIsGenerating(true);
 
-    // Look up if we have a key configured for our chosen model/provider target
-    // For standalone gemini pickers, try to look up any valid active gemini configuration
     const primaryTargetProvider = selectedModel.startsWith("gemini") ? "gemini" : 
                                   selectedModel.startsWith("gpt") ? "openai" : 
                                   selectedModel.startsWith("claude") ? "anthropic" : selectedModel;
@@ -234,7 +242,6 @@ function Dashboard() {
     const activeCredential = savedProviders.find(p => p.provider === primaryTargetProvider) || savedProviders[0];
 
     if (!activeCredential) {
-      // Fake response loop warning user to provide target credentials
       setTimeout(() => {
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
@@ -262,7 +269,6 @@ function Dashboard() {
         const data = await res.json();
         aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No legible response returned from Gemini core pipeline node.";
       } else {
-        // Universal fallback layer for basic raw completion mocks of additional providers
         aiResponseText = `[Simulated edge route parsing via ${activeCredential.label}]: Received message "${currentMessageText}". Dynamic infrastructure hooks are completely operational. Next setup will map production pipelines to live stream outputs.`;
       }
 
@@ -286,9 +292,8 @@ function Dashboard() {
   };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden text-slate-900 relative bg-slate-50">
-      
-      {/* 🚨 Floating Global Status Banners */}
+    <>
+      {/* 🚨 Floating Global Status Banners positioned in the top-right corner */}
       {notification && (
         <div className="fixed top-4 right-4 z-[100] w-full max-w-sm animate-in fade-in slide-in-from-top-4 duration-200">
           <div className={`flex items-center gap-3 rounded-xl border p-4 shadow-xl text-sm font-medium ${
@@ -309,199 +314,278 @@ function Dashboard() {
         </div>
       )}
 
-      {/* Top Navigation Control Bar */}
-      <header className="flex h-14 items-center justify-between border-b bg-white px-6 relative z-40 shadow-sm">
-        <div className="flex items-center gap-2 font-semibold">
-          <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
-          <span className="text-slate-800 text-base font-bold tracking-tight">Multi-AI Sandbox Dev Environment</span>
-        </div>
-
-        {/* Action Controls & Interactive Model/Key Tools */}
-        <div className="flex items-center gap-4 relative">
-          
-          {/* 🔑 Interactive Panel Control Interface */}
-          <div>
-            <button
-              onClick={() => setIsKeyPanelOpen(!isKeyPanelOpen)}
-              className={`inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium shadow-sm transition-colors focus:outline-none ${
-                isKeyPanelOpen || savedProviders.length > 0
-                  ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800" 
-                  : "bg-background text-foreground border-input hover:bg-muted"
-              }`}
-            >
+      {/* 🟢 LAYOUT 1: The Initial "Landing Page" View */}
+      {!hasChatStarted ? (
+        <div className="min-h-screen bg-[#fafbfc] flex flex-col font-sans">
+          <header className="flex h-16 items-center justify-between px-8 w-full border-b border-transparent">
+            <div className="flex items-center gap-2 font-bold text-lg text-slate-900">
+              <Sparkles className="h-5 w-5" />
+              <span>VibeCoder</span>
+            </div>
+            <button onClick={() => setIsKeyPanelOpen(true)} className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">
               <Key className="h-4 w-4" />
-              <span>API Keys</span>
+              <span>AI Providers</span>
             </button>
-          </div>
+          </header>
 
-          {/* State-Driven Model Picker */}
-          <div className="flex items-center gap-2">
-            <select
-              id="model-select"
-              value={selectedModel}
-              onChange={(e) => handleModelChange(e.target.value as AIModel)}
-              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring font-medium text-slate-700"
-            >
-              {savedProviders.length > 0 && (
-                <optgroup label="Your Activated Custom Key Routes">
-                  {savedProviders.map((cred) => (
-                    <option key={cred.id} value={cred.provider}>
-                      {cred.label} ({cred.provider})
-                    </option>
-                  ))}
-                </optgroup>
-              )}
+          <main className="flex-1 w-full max-w-4xl mx-auto flex flex-col items-center pt-20 px-6 pb-12 animate-in fade-in duration-500">
+            <h1 className="text-[40px] font-bold text-slate-900 tracking-tight mb-3">Vibe-code with any AI.</h1>
+            <p className="text-slate-500 text-lg mb-10">Bring your own keys — Gemini, OpenAI, Claude, Lovable, OpenRouter, anything.</p>
 
-              <optgroup label="Google Gemini (Native SDK)">
-                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-              </optgroup>
-              <optgroup label="OpenAI API Integration">
-                <option value="gpt-4o">GPT-4o Engine</option>
-              </optgroup>
-              <optgroup label="Anthropic Models">
-                <option value="claude-3.7-sonnet">Claude 3.7 Sonnet</option>
-              </optgroup>
-              <optgroup label="Mistral & Open-Weight Ecosystem">
-                <option value="mistral">Mistral Large</option>
-                <option value="groq">Groq LPU Acceleration</option>
-                <option value="deepseek">DeepSeek R1 / V3</option>
-              </optgroup>
-              <optgroup label="Routing Layers & Custom Aggregators">
-                <option value="openrouter">OpenRouter Global Endpoint</option>
-                <option value="custom">Custom Route Configuration</option>
-              </optgroup>
-              <optgroup label="Offline Edge Runtimes">
-                <option value="local-llama">Local Llama 3 (Sandbox Execution)</option>
-              </optgroup>
-            </select>
-          </div>
-
-          <button className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow transition-colors hover:bg-slate-800">
-            Generate Code
-          </button>
-        </div>
-      </header>
-
-      {/* Main Panel Workspace */}
-      <main className="flex flex-1 overflow-hidden relative z-10">
-        {/* Left Sidebar */}
-        <div className="w-80 border-r bg-white p-4 flex flex-col gap-4 shadow-sm">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-1.5">System Context Configuration</h3>
-            <textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              className="w-full h-32 rounded-lg border border-slate-200 bg-slate-50/50 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 resize-none text-slate-800 placeholder:text-slate-400"
-            />
-          </div>
-          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3 text-xs text-slate-500 leading-relaxed">
-            <span className="font-semibold block text-slate-700 mb-1">
-              Engine Metadata:
-            </span>
-            Target compilation running on Vite 7 with automated cloud deployments
-            via Nitro Edge engine workers.
-          </div>
-        </div>
-
-        {/* Right Code Workspace & 💬 Integrated Chatbox split container */}
-        <div className="flex flex-1 flex-col overflow-hidden bg-white">
-          {/* Top Code Section Area */}
-          <div className="flex-1 min-h-[40%] border-b border-slate-100 p-4 relative flex flex-col">
-            <div className="text-xs font-semibold text-slate-500 tracking-wider uppercase mb-2 flex items-center justify-between">
-              <span>Active Code Sandbox Canvas</span>
-              <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] uppercase font-bold">{selectedModel}</span>
-            </div>
-            <div className="flex-1 w-full rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-              <Editor
-                height="100%"
-                defaultLanguage="javascript"
-                theme="light"
-                value={code}
-                onChange={(value) => setCode(value || "")}
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 13,
-                  lineNumbers: "on",
-                  roundedSelection: true,
-                  scrollBeyondLastLine: false,
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Bottom Chat Section Canvas */}
-          <div className="h-[45%] flex flex-col bg-slate-50/70 overflow-hidden">
-            <div className="px-4 py-2 border-b border-slate-200 bg-white flex items-center justify-between text-xs font-semibold text-slate-600 shadow-sm">
-              <span className="flex items-center gap-1.5"><Bot className="h-4 w-4 text-indigo-600" /> AI Assistant Console</span>
-              <span className="text-[10px] text-slate-400 font-mono">Channel: Local client session</span>
-            </div>
-
-            {/* Scrollable Message Box */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex gap-3 max-w-[85%] animate-in fade-in slide-in-from-bottom-2 duration-150 ${
-                    msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
-                  }`}
-                >
-                  <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 shadow-sm ${
-                    msg.role === "user" ? "bg-slate-900 text-white" : "bg-indigo-600 text-white"
-                  }`}>
-                    {msg.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                  </div>
-                  <div className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
-                    msg.role === "user"
-                      ? "bg-slate-900 text-white font-medium"
-                      : "bg-white border border-slate-200 text-slate-800"
-                  }`}>
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                    <span className={`block text-[10px] mt-1 text-right ${msg.role === "user" ? "text-slate-400" : "text-slate-400"}`}>
-                      {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                </div>
-              ))}
-              
-              {isGenerating && (
-                <div className="flex gap-3 max-w-[85%] mr-auto items-center animate-pulse">
-                  <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                    <RefreshCw className="h-4 w-4 text-indigo-600 animate-spin" />
-                  </div>
-                  <div className="bg-white border border-slate-200 text-slate-400 rounded-xl px-4 py-2 text-xs font-medium italic shadow-sm">
-                    AI is calculating response framework targets...
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Input Action Form */}
-            <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-200 bg-white flex gap-2 shadow-inner">
-              <input
-                type="text"
+            <form onSubmit={handleSendMessage} className="w-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col mb-12 transition-shadow focus-within:shadow-md focus-within:border-slate-300">
+              <textarea
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder={savedProviders.length === 0 ? "⚠️ Add an API key above to talk to an AI provider..." : "Ask AI to generate functions, explain issues, or build prototypes..."}
-                disabled={savedProviders.length === 0 || isGenerating}
-                className="flex-1 h-10 px-4 rounded-lg border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600/20 text-slate-800 placeholder:text-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (chatInput.trim()) handleSendMessage();
+                  }
+                }}
+                placeholder="Describe an app to build... e.g. a pomodoro timer with dark mode"
+                className="w-full h-28 p-5 outline-none resize-none text-slate-800 placeholder:text-slate-400 text-base"
               />
-              <button
-                type="submit"
-                disabled={!chatInput.trim() || isGenerating || savedProviders.length === 0}
-                className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-lg bg-slate-900 text-white transition-colors hover:bg-slate-800 focus:outline-none shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Send className="h-4 w-4" />
-              </button>
+              <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
+                <span className="text-xs font-medium text-slate-400">Ready to build</span>
+                <button
+                  type="submit"
+                  disabled={!chatInput.trim()}
+                  className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="h-4 w-4" /> New project
+                </button>
+              </div>
             </form>
-          </div>
-        </div>
-      </main>
 
-      {/* 📋 Centered Multi-Provider Modal Panel Overlay */}
+            <div className="w-full flex flex-col gap-4">
+              <h3 className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-1">Your Projects</h3>
+              <div className="bg-white rounded-xl border border-slate-200 p-4 flex justify-between items-center shadow-sm cursor-pointer hover:border-slate-300 transition-colors">
+                <div>
+                  <h4 className="font-semibold text-slate-900 text-sm">Untitled project</h4>
+                  <p className="text-xs text-slate-400 mt-1">6/10/2026, 8:00:38 AM · 3 files</p>
+                </div>
+                <button className="text-slate-400 hover:text-slate-600 p-2 rounded-md transition-colors focus:outline-none"><Trash2 className="h-4 w-4" /></button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ListTodo className="h-4 w-4 text-slate-700" />
+                    <h4 className="font-semibold text-slate-900 text-sm">Plan-first mode</h4>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">Toggle the planner and the AI writes a short plan before touching code.</p>
+                </div>
+                <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Timer className="h-4 w-4 text-slate-700" />
+                    <h4 className="font-semibold text-slate-900 text-sm">Live build timer</h4>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">Watch elapsed time and step count tick up while the agent works.</p>
+                </div>
+                <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Wrench className="h-4 w-4 text-slate-700" />
+                    <h4 className="font-semibold text-slate-900 text-sm">Auto-fix preview errors</h4>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">When the sandbox throws, one click sends the error back to the model.</p>
+                </div>
+                <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-2">
+                    <RotateCcw className="h-4 w-4 text-slate-700" />
+                    <h4 className="font-semibold text-slate-900 text-sm">Checkpoints & revert</h4>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">Every turn snapshots your files. Roll back any time from the History menu.</p>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      ) : (
+
+        /* 🔵 LAYOUT 2: The IDE Split-Pane View (Triggered once you type a prompt and press New Project) */
+        <div className="flex h-screen flex-col overflow-hidden text-slate-900 relative bg-slate-50 animate-in fade-in zoom-in-95 duration-300">
+          <header className="flex h-14 items-center justify-between border-b bg-white px-6 relative z-40 shadow-sm">
+            <div className="flex items-center gap-2 font-semibold">
+              <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
+              <span className="text-slate-800 text-base font-bold tracking-tight">Multi-AI Sandbox Dev Environment</span>
+            </div>
+
+            <div className="flex items-center gap-4 relative">
+              <div>
+                <button
+                  onClick={() => setIsKeyPanelOpen(!isKeyPanelOpen)}
+                  className={`inline-flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium shadow-sm transition-colors focus:outline-none ${
+                    isKeyPanelOpen || savedProviders.length > 0
+                      ? "bg-slate-900 text-white border-slate-900 hover:bg-slate-800" 
+                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <Key className="h-4 w-4" />
+                  <span>API Keys</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  id="model-select"
+                  value={selectedModel}
+                  onChange={(e) => handleModelChange(e.target.value as AIModel)}
+                  className="h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium text-slate-700"
+                >
+                  {savedProviders.length > 0 && (
+                    <optgroup label="Your Activated Custom Key Routes">
+                      {savedProviders.map((cred) => (
+                        <option key={cred.id} value={cred.provider}>
+                          {cred.label} ({cred.provider})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="Google Gemini (Native SDK)">
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                  </optgroup>
+                  <optgroup label="OpenAI API Integration">
+                    <option value="gpt-4o">GPT-4o Engine</option>
+                  </optgroup>
+                  <optgroup label="Anthropic Models">
+                    <option value="claude-3.7-sonnet">Claude 3.7 Sonnet</option>
+                  </optgroup>
+                  <optgroup label="Mistral & Open-Weight Ecosystem">
+                    <option value="mistral">Mistral Large</option>
+                    <option value="groq">Groq LPU Acceleration</option>
+                    <option value="deepseek">DeepSeek R1 / V3</option>
+                  </optgroup>
+                  <optgroup label="Routing Layers & Custom Aggregators">
+                    <option value="openrouter">OpenRouter Global Endpoint</option>
+                    <option value="custom">Custom Route Configuration</option>
+                  </optgroup>
+                  <optgroup label="Offline Edge Runtimes">
+                    <option value="local-llama">Local Llama 3 (Sandbox Execution)</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              <button className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow transition-colors hover:bg-slate-800">
+                Generate Code
+              </button>
+            </div>
+          </header>
+
+          <main className="flex flex-1 overflow-hidden relative z-10">
+            <div className="w-80 border-r border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm z-10">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 mb-1.5">System Context Configuration</h3>
+                <textarea
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  className="w-full h-32 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none text-slate-800"
+                />
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs text-slate-500 leading-relaxed">
+                <span className="font-semibold block text-slate-700 mb-1">
+                  Engine Metadata:
+                </span>
+                Target compilation running on Vite 7 with automated cloud deployments
+                via Nitro Edge engine workers.
+              </div>
+            </div>
+
+            <div className="flex flex-1 flex-col overflow-hidden bg-white">
+              <div className="flex-1 min-h-[40%] border-b border-slate-100 p-4 relative flex flex-col">
+                <div className="text-xs font-semibold text-slate-500 tracking-wider uppercase mb-2 flex items-center justify-between">
+                  <span>Active Code Sandbox Canvas</span>
+                  <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] uppercase font-bold">{selectedModel}</span>
+                </div>
+                <div className="flex-1 w-full rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                  <Editor
+                    height="100%"
+                    defaultLanguage="javascript"
+                    theme="light"
+                    value={code}
+                    onChange={(value) => setCode(value || "")}
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 13,
+                      lineNumbers: "on",
+                      roundedSelection: true,
+                      scrollBeyondLastLine: false,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="h-[45%] flex flex-col bg-slate-50/70 overflow-hidden">
+                <div className="px-4 py-2 border-b border-slate-200 bg-white flex items-center justify-between text-xs font-semibold text-slate-600 shadow-sm">
+                  <span className="flex items-center gap-1.5"><Bot className="h-4 w-4 text-indigo-600" /> AI Assistant Console</span>
+                  <span className="text-[10px] text-slate-400 font-mono">Channel: Local client session</span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+                  {messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex gap-3 max-w-[85%] animate-in fade-in slide-in-from-bottom-2 duration-150 ${
+                        msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
+                      }`}
+                    >
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 shadow-sm ${
+                        msg.role === "user" ? "bg-slate-900 text-white" : "bg-indigo-600 text-white"
+                      }`}>
+                        {msg.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                      </div>
+                      <div className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
+                        msg.role === "user"
+                          ? "bg-slate-900 text-white font-medium"
+                          : "bg-white border border-slate-200 text-slate-800"
+                      }`}>
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        <span className={`block text-[10px] mt-1 text-right text-slate-400`}>
+                          {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {isGenerating && (
+                    <div className="flex gap-3 max-w-[85%] mr-auto items-center animate-pulse">
+                      <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                        <RefreshCw className="h-4 w-4 text-indigo-600 animate-spin" />
+                      </div>
+                      <div className="bg-white border border-slate-200 text-slate-400 rounded-xl px-4 py-2 text-xs font-medium italic shadow-sm">
+                        AI is calculating response framework targets...
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                <form onSubmit={handleSendMessage} className="p-3 border-t border-slate-200 bg-white flex gap-2 shadow-inner">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder={savedProviders.length === 0 ? "⚠️ Add an API key above to talk to an AI provider..." : "Ask AI to generate functions, explain issues, or build prototypes..."}
+                    disabled={savedProviders.length === 0 || isGenerating}
+                    className="flex-1 h-10 px-4 rounded-lg border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 placeholder:text-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!chatInput.trim() || isGenerating || savedProviders.length === 0}
+                    className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-lg bg-slate-900 text-white transition-colors hover:bg-slate-800 focus:outline-none shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Send className="h-4 w-4" />
+                  </button>
+                </form>
+              </div>
+            </div>
+          </main>
+        </div>
+      )}
+
+      {/* 📋 Centered Multi-Provider Modal Panel Overlay (Accessible from both layouts!) */}
       {isKeyPanelOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-150">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[200] animate-in fade-in duration-150">
           <div className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150 relative">
             
             <button 
@@ -511,7 +595,6 @@ function Dashboard() {
               <X className="h-5 w-5" />
             </button>
 
-            {/* Modal Header */}
             <div className="mb-4">
               <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
                 <Key className="h-5 w-5 text-slate-700" /> AI Providers
@@ -521,7 +604,6 @@ function Dashboard() {
               </p>
             </div>
             
-            {/* Active Credentials Summary Block */}
             <div className="space-y-2 mb-4">
               {savedProviders.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 bg-slate-50/50">
@@ -571,11 +653,8 @@ function Dashboard() {
             </div>
 
             <div className="space-y-4 border-t border-slate-100 pt-4">
-              {/* Select Provider Block */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-700">
-                  Add a provider
-                </label>
+                <label className="text-xs font-semibold text-slate-700">Add a provider</label>
                 <select
                   value={keyProvider}
                   onChange={(e) => setKeyProvider(e.target.value as KeyProvider)}
@@ -593,11 +672,8 @@ function Dashboard() {
                 </select>
               </div>
 
-              {/* API Secret Key Field */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-700">
-                  Get a key ↗
-                </label>
+                <label className="text-xs font-semibold text-slate-700">Get a key ↗</label>
                 <input
                   type="password"
                   placeholder={keyProvider === "local" ? "http://localhost:11434" : "Paste credentials here..."}
@@ -607,11 +683,8 @@ function Dashboard() {
                 />
               </div>
 
-              {/* Option Label Field */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-700">
-                  Label / Name
-                </label>
+                <label className="text-xs font-semibold text-slate-700">Label / Name</label>
                 <input
                   type="text"
                   placeholder="e.g. My Primary Workspace Key"
@@ -621,7 +694,6 @@ function Dashboard() {
                 />
               </div>
 
-              {/* Action Button */}
               <button 
                 onClick={handleTestAndAdd}
                 disabled={isTesting}
@@ -640,6 +712,6 @@ function Dashboard() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -1,4 +1,4 @@
-import { SettingsModal } from "../components/SettingsModal";
+import { SettingsModal } from "@/components/SettingsModal";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";

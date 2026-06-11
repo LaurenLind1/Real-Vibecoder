@@ -41,6 +41,11 @@ function Dashboard() {
     openai: "",
     anthropic: "",
     local: "",
+    mistral: "",
+    groq: "",
+    deepseek: "",
+    openrouter: "",
+    custom: "",
   });
 
   const handleModelChange = (model: AIModel) => {
@@ -117,6 +122,11 @@ function Dashboard() {
                       <option value="openai">OpenAI API Key</option>
                       <option value="anthropic">Anthropic Claude Key</option>
                       <option value="local">Local Host URL Endpoint</option>
+                      <option value="mistral">Mistral AI Key</option>
+                      <option value="groq">Groq API Key</option>
+                      <option value="deepseek">DeepSeek API Key</option>
+                      <option value="openrouter">OpenRouter API Key</option>
+                      <option value="custom">Custom Configuration Endpoint</option>
                     </select>
                   </div>
 
@@ -161,6 +171,15 @@ function Dashboard() {
               <optgroup label="Anthropic Models">
                 <option value="claude-3.7-sonnet">Claude 3.7 Sonnet</option>
               </optgroup>
+              <optgroup label="Mistral & Open-Weight Ecosystem">
+                <option value="mistral">Mistral Large</option>
+                <option value="groq">Groq LPU Acceleration</option>
+                <option value="deepseek">DeepSeek R1 / V3</option>
+              </optgroup>
+              <optgroup label="Routing Layers & Custom Aggregators">
+                <option value="openrouter">OpenRouter Global Endpoint</option>
+                <option value="custom">Custom Route Configuration</option>
+              </optgroup>
               <optgroup label="Offline Edge Runtimes">
                 <option value="local-llama">Local Llama 3 (Sandbox Execution)</option>
               </optgroup>
@@ -195,7 +214,6 @@ function Dashboard() {
         </div>
 
         {/* Right Code Canvas */}
-      {/* Right Code Canvas */}
         <div className="flex flex-1 flex-col bg-background">
           <div className="flex items-center justify-between border-b px-4 py-2">
             {/* Canvas Header Elements Go Here */}

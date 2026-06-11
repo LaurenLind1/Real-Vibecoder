@@ -1,5 +1,5 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
-import "../index.css"; // <-- This is the magic line we are missing!
+import "../style.css"; // <-- This points to the CSS file!
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -7,8 +7,8 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   return (
-    <>
+    <div className="min-h-screen bg-background text-foreground antialiased">
       <Outlet />
-    </>
+    </div>
   );
 }

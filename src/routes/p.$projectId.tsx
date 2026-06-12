@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import Editor from "@monaco-editor/react";
 import { 
   Key, X, Trash2, CheckCircle2, AlertTriangle, RefreshCw, 
-  Send, Bot, User, Sparkles, Plus, ListTodo, Timer, Wrench, RotateCcw, Play, Home, ArrowRight, LayoutTemplate
+  Send, Bot, User, Sparkles, Plus, ListTodo, Timer, Wrench, RotateCcw, Play, Home, ArrowRight
 } from "lucide-react";
 
 export const Route = createFileRoute("/p/$projectId")({
@@ -52,7 +52,7 @@ interface Project {
   fileCount: number;
 }
 
-export default function Dashboard() {
+function Dashboard() {
   const [currentPage, setCurrentPage] = useState<PageView>("home");
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
 
@@ -64,49 +64,12 @@ export default function Dashboard() {
   });
 
   const [selectedModel, setSelectedModel] = useState<AIModel>("gemini-2.5-flash");
-  
-  // The default code is now a valid HTML document so the iframe can render it immediately
   const [code, setCode] = useState<string>(
-    `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VibeCoder Sandbox</title>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      background: linear-gradient(135deg, #e0e7ff 0%, #f0fdf4 100%);
-      color: #1e293b;
-    }
-    .card {
-      background: white;
-      padding: 2rem 3rem;
-      border-radius: 1rem;
-      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-      text-align: center;
-    }
-    h1 { margin: 0 0 0.5rem 0; color: #4f46e5; }
-    p { margin: 0; color: #64748b; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>Hello, VibeCoder! ✨</h1>
-    <p>I am your live execution sandbox.</p>
-  </div>
-</body>
-</html>`
+    `// Selected Engine: ${selectedModel}\nfunction init() {\n  console.log("Hello from your sandbox workspace!");\n}`
   );
   
   const [buildSeconds, setBuildSeconds] = useState<number>(0);
   const [codeHistory, setCodeHistory] = useState<string[]>([]);
-
   const [systemPrompt, setSystemPrompt] = useState<string>("");
 
   const [isKeyPanelOpen, setIsKeyPanelOpen] = useState<boolean>(false);
@@ -124,7 +87,7 @@ export default function Dashboard() {
     {
       id: "welcome",
       role: "assistant",
-      content: "Hello! I am connected to your Multi-AI Sandbox environment. Let's start building! Describe an app you'd like to create.",
+      content: "Hello! I am connected to your Multi-AI Sandbox environment. Let's start writing some code!",
       timestamp: new Date()
     }
   ]);
@@ -167,14 +130,80 @@ export default function Dashboard() {
 
   const handleModelChange = (model: AIModel) => {
     setSelectedModel(model);
+    setCode((prev) =>
+      `// Switched engine context to: ${model}\n` +
+      prev.replace(/\/\/ Selected Engine: .*\n|\/\/ Switched engine context to: .*\n/, "")
+    );
   };
 
+  // FIXED: Now accurately tests ALL keys against their true live API endpoints
   const runKeyValidationProbe = async (provider: KeyProvider, secretKey: string): Promise<boolean> => {
     try {
       if (provider === "gemini") {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${secretKey}`);
         return res.status === 200;
       }
+
+      if (provider === "openai") {
+        const res = await fetch("https://api.openai.com/v1/models", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${secretKey}` }
+        });
+        return res.status === 200;
+      }
+
+      if (provider === "anthropic") {
+        // Direct validation lookup to Anthropic models route
+        const res = await fetch("https://api.anthropic.com/v1/models", {
+          method: "GET",
+          headers: {
+            "x-api-key": secretKey,
+            "anthropic-version": "2023-06-01"
+          }
+        });
+        return res.status === 200;
+      }
+
+      if (provider === "groq") {
+        const res = await fetch("https://api.groq.com/openai/v1/models", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${secretKey}` }
+        });
+        return res.status === 200;
+      }
+
+      if (provider === "deepseek") {
+        const res = await fetch("https://api.deepseek.com/models", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${secretKey}` }
+        });
+        return res.status === 200;
+      }
+
+      if (provider === "mistral") {
+        const res = await fetch("https://api.mistral.ai/v1/models", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${secretKey}` }
+        });
+        return res.status === 200;
+      }
+
+      if (provider === "openrouter") {
+        const res = await fetch("https://openrouter.ai/api/v1/auth/key", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${secretKey}` }
+        });
+        return res.status === 200;
+      }
+
+      if (provider === "local") {
+        // Pings standard local server instances (Ollama/LM Studio)
+        const res = await fetch("http://localhost:11434/api/tags").catch(() => 
+          fetch("http://localhost:1234/v1/models")
+        );
+        return res.ok;
+      }
+
       return true; 
     } catch {
       return false;
@@ -242,21 +271,6 @@ export default function Dashboard() {
     sendToAI(rawPrompt);
   };
 
-  const extractCode = (text: string) => {
-    const ticks = String.fromCharCode(96, 96, 96);
-    const pattern = new RegExp(ticks + '(?:[a-z]*\\n)?([\\s\\S]*?)' + ticks, 'i');
-    const match = text.match(pattern);
-    return match ? match[1].trim() : null;
-  };
-
-  // Helper to map a model name to its required provider key type
-  const getProviderForModel = (m: string): KeyProvider => {
-    if (m.startsWith("gemini")) return "gemini";
-    if (m.startsWith("gpt")) return "openai";
-    if (m.startsWith("claude")) return "anthropic";
-    return m as KeyProvider;
-  };
-
   const sendToAI = async (messageText: string) => {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(), role: "user", content: messageText, timestamp: new Date()
@@ -269,109 +283,56 @@ export default function Dashboard() {
       setCodeHistory(prev => [...prev, code]);
     }
 
-    // 1. Define logical fallback chains for each selected model
-    const fallbackChains: Record<string, AIModel[]> = {
-      "gemini-2.5-pro": ["claude-3.7-sonnet", "gpt-4o", "gemini-2.5-flash"],
-      "gpt-4o": ["claude-3.7-sonnet", "gemini-2.5-pro", "gemini-2.5-flash"],
-      "claude-3.7-sonnet": ["gpt-4o", "gemini-2.5-pro", "gemini-2.5-flash"],
-      "gemini-2.5-flash": ["mistral", "groq", "deepseek", "local-llama"],
-    };
+    const primaryTargetProvider = selectedModel.startsWith("gemini") ? "gemini" : 
+                                  selectedModel.startsWith("gpt") ? "openai" : 
+                                  selectedModel.startsWith("claude") ? "anthropic" : selectedModel;
 
-    // 2. Build a unique fallback model queue to iterate through
-    const defaultFallbacks: AIModel[] = ["gemini-2.5-flash", "gpt-4o", "claude-3.7-sonnet", "groq", "mistral"];
-    const queue = [selectedModel, ...(fallbackChains[selectedModel] || defaultFallbacks)];
-    const modelsToTry = Array.from(new Set(queue)); // Avoid duplicate model tries
+    const activeCredential = savedProviders.find(p => p.provider === primaryTargetProvider) || savedProviders[0];
 
-    const basePrompt = systemPrompt.trim() || "You are an expert full-stack developer assistant. CRITICAL: When writing or updating code, you MUST output a SINGLE, complete, runnable HTML file containing all HTML, CSS (in `<style>`), and JavaScript (in `<script>`). Wrap your final solution in a single markdown code block (using triple backticks, e.g. ```html). Output the ENTIRE updated file content.";
+    if (!activeCredential) {
+      setTimeout(() => {
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(), role: "assistant", content: `⚠️ No active key found for "${primaryTargetProvider}". Please use the "API Keys" button to get connected.`, timestamp: new Date()
+        }]);
+        setIsGenerating(false);
+      }, 800);
+      return;
+    }
+
+    const basePrompt = systemPrompt.trim() || "You are an expert full-stack developer assistant.";
     const finalSystemPrompt = activeFeatures.planMode 
       ? basePrompt + "\n\nCRITICAL INSTRUCTION: You must start your response with a numbered list outlining your step-by-step plan before writing ANY code blocks." 
       : basePrompt;
 
-    let aiResponseText = "";
-    let success = false;
-    let lastErrorMessage = "No configured API key found for this provider path.";
+    try {
+      let aiResponseText = "";
 
-    // 3. Keep trying fallback options if one runs out of tokens or fails
-    for (let i = 0; i < modelsToTry.length; i++) {
-      const currentModel = modelsToTry[i];
-      const targetProvider = getProviderForModel(currentModel);
-      const activeCredential = savedProviders.find(p => p.provider === targetProvider);
-
-      if (!activeCredential) {
-        continue; // No key for this model? Skip directly to the next fallback candidate
+      if (activeCredential.provider === "gemini") {
+        const targetModelName = selectedModel.includes("pro") ? "gemini-2.5-pro" : "gemini-2.5-flash";
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModelName}:generateContent?key=${activeCredential.key}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `System context: ${finalSystemPrompt}\n\nUser request: ${messageText}` }] }]
+          })
+        });
+        const data = await res.json();
+        aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No legible response returned.";
+      } else {
+        aiResponseText = `[Mock Response via ${activeCredential.label}]: Received message "${messageText}".\n\n${activeFeatures.planMode ? "1. Analyzing request\n2. Structuring fix\n3. Applying code\n\n" : ""}Code would be generated here.`;
       }
 
-      try {
-        // Post a notification in the chat if a fallback has been triggered
-        if (i > 0) {
-          setMessages((prev) => [...prev, {
-            id: crypto.randomUUID(), role: "assistant", 
-            content: `⚠️ Selected model failed (rate limit / token limit). Automatically falling back to **${currentModel}**...`, 
-            timestamp: new Date()
-          }]);
-        }
-
-        if (activeCredential.provider === "gemini") {
-          const targetModelName = currentModel.includes("pro") ? "gemini-2.5-pro" : "gemini-2.5-flash";
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModelName}:generateContent?key=${activeCredential.key}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: `System context: ${finalSystemPrompt}\n\nHere is the current code in the sandbox:\n\n${code}\n\nUser request: ${messageText}` }] }]
-            })
-          });
-
-          // Throw an error on exhaustion or API level failures to engage the failover loop
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(`API Rate Limit/Token Issue: ${res.status} - ${errData?.error?.message || res.statusText}`);
-          }
-
-          const data = await res.json();
-          aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          
-          if (!aiResponseText) throw new Error("Empty response returned from Gemini API.");
-
-        } else {
-          // Mock structure for alternate APIs or custom providers
-          const ticks = String.fromCharCode(96, 96, 96);
-          const mockHtml = `<!DOCTYPE html>\n<html>\n<head>\n<style>body{font-family:sans-serif; text-align:center; padding:50px; background:#f0fdf4; color:#166534;}</style>\n</head>\n<body>\n<h1>Success! (via Fallback: ${currentModel}) ✅</h1>\n<p>Requested: ${messageText}</p>\n<script>console.log("Mock JS executed");</script>\n</body>\n</html>`;
-          
-          await new Promise(resolve => setTimeout(resolve, 800)); // Simulate round-trip latency
-          
-          aiResponseText = `[Response via ${activeCredential.label} using ${currentModel}]: Received message "${messageText}".\n\n${activeFeatures.planMode ? "1. Analyzing request\n2. Structuring fix\n3. Applying code\n\n" : ""}Here is your generated code:\n${ticks}html\n${mockHtml}\n${ticks}`;
-        }
-
-        success = true;
-        break; // Successfully got a response, end the fallback loop!
-
-      } catch (err) {
-        console.warn(`[Failover Activated] ${currentModel} failed:`, err);
-        lastErrorMessage = (err as Error).message;
-        // The catch statement swallows the error so the for-loop continues onto the next best choice
-      }
-    }
-
-    // 4. Handle final message updates and state code injects
-    if (success) {
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(), role: "assistant", content: aiResponseText, timestamp: new Date()
       }]);
 
-      const newCode = extractCode(aiResponseText);
-      if (newCode) {
-        setCode(newCode);
-        setNotification({ type: "success", message: "Sandbox updated with AI code!" });
-      }
-    } else {
+    } catch (err) {
       setMessages((prev) => [...prev, {
-        id: crypto.randomUUID(), role: "assistant", 
-        content: `❌ Request failed. All available fallback models were exhausted or no valid API keys were found for them. Last Error: ${lastErrorMessage}`, 
-        timestamp: new Date()
+        id: crypto.randomUUID(), role: "assistant", content: `❌ Error: ${(err as Error).message}`, timestamp: new Date()
       }]);
+    } finally {
+      setIsGenerating(false);
     }
-
-    setIsGenerating(false);
   };
 
   const formatTime = (seconds: number) => {
@@ -394,6 +355,7 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* 🏠 PAGE ONE: HOME DASHBOARD */}
       {currentPage === "home" && (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
           <header className="flex h-20 items-center justify-between px-8 w-full border-b border-slate-200 bg-white shadow-sm">
@@ -499,9 +461,10 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* 💻 PAGE TWO: CHATBOX WORKSPACE */}
       {currentPage === "chatbox" && (
         <div className="flex h-screen flex-col overflow-hidden text-slate-900 relative bg-slate-50 animate-in fade-in duration-300">
-          <header className="flex h-14 items-center justify-between border-b bg-white px-6 relative z-40 shadow-sm shrink-0">
+          <header className="flex h-14 items-center justify-between border-b bg-white px-6 relative z-40 shadow-sm">
             <div className="flex items-center gap-4">
               <button onClick={() => setCurrentPage("home")} className="p-1.5 hover:bg-slate-100 rounded-md text-slate-500 transition-colors">
                 <Home className="h-5 w-5" />
@@ -545,8 +508,7 @@ export default function Dashboard() {
           </header>
 
           <main className="flex flex-1 overflow-hidden relative z-10">
-            {/* LEFT SIDEBAR */}
-            <div className="w-64 border-r border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm z-10 overflow-y-auto shrink-0">
+            <div className="w-72 border-r border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm z-10 overflow-y-auto">
               <div>
                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">System Context</h3>
                 <textarea 
@@ -560,76 +522,72 @@ export default function Dashboard() {
               <div className="flex flex-col gap-2 pt-3 border-t border-slate-100">
                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Feature Toggles</h3>
                  
-                 <button onClick={() => toggleFeature('planMode')} className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-semibold transition-colors ${activeFeatures.planMode ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                 <button 
+                    onClick={() => toggleFeature('planMode')}
+                    className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-semibold transition-colors ${
+                      activeFeatures.planMode ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
                     <div className="flex items-center gap-2"><ListTodo className="h-3.5 w-3.5"/> Plan-first mode</div>
                     {activeFeatures.planMode && <div className="h-1.5 w-1.5 rounded-full bg-indigo-600" />}
                   </button>
 
-                  <button onClick={() => toggleFeature('liveTimer')} className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-semibold transition-colors ${activeFeatures.liveTimer ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                  <button 
+                    onClick={() => toggleFeature('liveTimer')}
+                    className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-semibold transition-colors ${
+                      activeFeatures.liveTimer ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
                     <div className="flex items-center gap-2"><Timer className="h-3.5 w-3.5"/> Build Timer {activeFeatures.liveTimer ? `(${formatTime(buildSeconds)})` : ""}</div>
                     {activeFeatures.liveTimer && <div className="h-1.5 w-1.5 rounded-full bg-emerald-600" />}
                   </button>
 
-                  <button onClick={() => toggleFeature('checkpoints')} className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-semibold transition-colors ${activeFeatures.checkpoints ? "bg-sky-50 border-sky-200 text-sky-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                  <button 
+                    onClick={() => toggleFeature('checkpoints')}
+                    className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-semibold transition-colors ${
+                      activeFeatures.checkpoints ? "bg-sky-50 border-sky-200 text-sky-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
                     <div className="flex items-center gap-2"><RotateCcw className="h-3.5 w-3.5"/> Checkpoints {activeFeatures.checkpoints ? `(${codeHistory.length})` : ""}</div>
                     {activeFeatures.checkpoints && <div className="h-1.5 w-1.5 rounded-full bg-sky-600" />}
                   </button>
 
-                  <button onClick={() => toggleFeature('autoFix')} className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-semibold transition-colors ${activeFeatures.autoFix ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                  <button 
+                    onClick={() => toggleFeature('autoFix')}
+                    className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-semibold transition-colors ${
+                      activeFeatures.autoFix ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
                     <div className="flex items-center gap-2"><Wrench className="h-3.5 w-3.5"/> Auto-fix Errors</div>
                     {activeFeatures.autoFix && <div className="h-1.5 w-1.5 rounded-full bg-amber-600" />}
                   </button>
               </div>
             </div>
 
-            {/* MAIN WORKSPACE AREA */}
             <div className="flex flex-1 flex-col overflow-hidden bg-white">
-              
-              {/* TOP HALF: Editor & Live Preview */}
-              <div className="flex-1 min-h-[50%] border-b border-slate-200 flex flex-row overflow-hidden">
-                
-                {/* Code Editor */}
-                <div className="flex-1 border-r border-slate-200 p-4 flex flex-col min-w-0">
-                  <div className="text-xs font-semibold text-slate-500 tracking-wider uppercase mb-2 flex items-center justify-between shrink-0">
-                    <span>Code Editor</span>
-                    <div className="flex items-center gap-2">
-                      {activeFeatures.autoFix && (
-                        <button onClick={simulateErrorAndFix} disabled={isGenerating} className="px-2 py-1 rounded bg-amber-100 text-amber-800 text-[10px] uppercase font-bold flex items-center gap-1 hover:bg-amber-200 disabled:opacity-50">
-                          <Wrench className="h-3 w-3" /> Simulate Error
-                        </button>
-                      )}
-                      {activeFeatures.checkpoints && codeHistory.length > 0 && (
-                        <button onClick={handleRevertCode} className="px-2 py-1 rounded bg-sky-100 text-sky-800 text-[10px] uppercase font-bold flex items-center gap-1 hover:bg-sky-200">
-                          <RotateCcw className="h-3 w-3" /> Revert
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex-1 w-full rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                    <Editor height="100%" defaultLanguage="html" theme="light" value={code} onChange={(value) => setCode(value || "")} options={{ minimap: { enabled: false }, fontSize: 13, lineNumbers: "on", roundedSelection: true, wordWrap: "on" }} />
+              <div className="flex-1 min-h-[40%] border-b border-slate-100 p-4 relative flex flex-col">
+                <div className="text-xs font-semibold text-slate-500 tracking-wider uppercase mb-2 flex items-center justify-between">
+                  <span>Code Sandbox</span>
+                  <div className="flex items-center gap-2">
+                    {activeFeatures.autoFix && (
+                      <button onClick={simulateErrorAndFix} disabled={isGenerating} className="px-2 py-1 rounded bg-amber-100 text-amber-800 text-[10px] uppercase font-bold flex items-center gap-1 hover:bg-amber-200 disabled:opacity-50">
+                        <Wrench className="h-3 w-3" /> Simulate Error
+                      </button>
+                    )}
+                    {activeFeatures.checkpoints && codeHistory.length > 0 && (
+                      <button onClick={handleRevertCode} className="px-2 py-1 rounded bg-sky-100 text-sky-800 text-[10px] uppercase font-bold flex items-center gap-1 hover:bg-sky-200">
+                        <RotateCcw className="h-3 w-3" /> Revert
+                      </button>
+                    )}
                   </div>
                 </div>
-
-                {/* LIVE SANDBOX PREVIEW */}
-                <div className="flex-1 p-4 flex flex-col bg-slate-50/50 min-w-0">
-                  <div className="text-xs font-semibold text-slate-500 tracking-wider uppercase mb-2 flex items-center gap-1.5 shrink-0">
-                    <LayoutTemplate className="h-4 w-4 text-indigo-500" /> Live Sandbox
-                  </div>
-                  <div className="flex-1 w-full rounded-xl border border-slate-200 overflow-hidden shadow-sm bg-white relative">
-                    <iframe
-                      title="VibeCoder Live Preview"
-                      srcDoc={code}
-                      sandbox="allow-scripts allow-forms allow-popups allow-modals"
-                      className="absolute inset-0 w-full h-full border-none"
-                    />
-                  </div>
+                <div className="flex-1 w-full rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                  <Editor height="100%" defaultLanguage="javascript" theme="light" value={code} onChange={(value) => setCode(value || "")} options={{ minimap: { enabled: false }, fontSize: 13, lineNumbers: "on", roundedSelection: true }} />
                 </div>
-
               </div>
 
-              {/* BOTTOM HALF: Chat Interface */}
-              <div className="h-[40%] flex flex-col bg-white overflow-hidden shrink-0">
-                <div className="px-4 py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between text-xs font-semibold text-slate-600 shrink-0">
+              <div className="h-[45%] flex flex-col bg-slate-50/70 overflow-hidden">
+                <div className="px-4 py-2 border-b border-slate-200 bg-white flex items-center justify-between text-xs font-semibold text-slate-600 shadow-sm">
                   <span className="flex items-center gap-1.5"><Bot className="h-4 w-4 text-indigo-600" /> AI Assistant Console</span>
                   {activeFeatures.liveTimer && isGenerating && (
                     <span className="text-emerald-600 font-mono flex items-center gap-1 animate-pulse"><Play className="h-3 w-3" fill="currentColor"/> {formatTime(buildSeconds)}</span>
@@ -652,14 +610,14 @@ export default function Dashboard() {
                   {isGenerating && (
                     <div className="flex gap-3 max-w-[85%] mr-auto items-center animate-pulse">
                       <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0"><RefreshCw className="h-4 w-4 text-indigo-600 animate-spin" /></div>
-                      <div className="bg-white border border-slate-200 text-slate-400 rounded-xl px-4 py-2 text-xs font-medium italic shadow-sm">AI is writing code...</div>
+                      <div className="bg-white border border-slate-200 text-slate-400 rounded-xl px-4 py-2 text-xs font-medium italic shadow-sm">AI is calculating response...</div>
                     </div>
                   )}
                   <div ref={chatEndRef} />
                 </div>
 
-                <form onSubmit={handleFormSubmit} className="p-3 border-t border-slate-200 bg-slate-50 flex gap-2 shrink-0">
-                  <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder={savedProviders.length === 0 ? "⚠️ Add an API key using the config button above to chat..." : "Ask AI to edit the code above..."} disabled={isGenerating || savedProviders.length === 0} className="flex-1 h-11 px-4 rounded-lg border border-slate-200 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 placeholder:text-slate-400 disabled:opacity-50" />
+                <form onSubmit={handleFormSubmit} className="p-3 border-t border-slate-200 bg-white flex gap-2 shadow-inner">
+                  <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder={savedProviders.length === 0 ? "⚠️ Add an API key using the config button above to chat..." : "Ask AI to edit the code above..."} disabled={isGenerating || savedProviders.length === 0} className="flex-1 h-11 px-4 rounded-lg border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 placeholder:text-slate-400 disabled:opacity-50" />
                   <button type="submit" disabled={!chatInput.trim() || isGenerating || savedProviders.length === 0} className="h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-lg bg-slate-900 text-white transition-colors hover:bg-slate-800 shadow-sm disabled:opacity-40"><Send className="h-4 w-4" /></button>
                 </form>
               </div>

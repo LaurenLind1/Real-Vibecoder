@@ -55,24 +55,21 @@ interface Project {
 export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState<PageView>("home");
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
-
   const [activeFeatures, setActiveFeatures] = useState({
     planMode: false,
     liveTimer: false,
     autoFix: false,
     checkpoints: false
   });
-
   const [selectedModel, setSelectedModel] = useState<AIModel>("gemini-2.5-flash");
   
-  // Clean, complete runnable HTML code frame template for the preview layout
   const [code, setCode] = useState<string>(
     `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sandbox Environment</title>
+  <title>VibeCoder Sandbox</title>
   <style>
     body {
       font-family: system-ui, -apple-system, sans-serif;
@@ -81,37 +78,38 @@ export default function Dashboard() {
       align-items: center;
       height: 100vh;
       margin: 0;
-      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-      color: #334155;
+      background: linear-gradient(135deg, #e0e7ff 0%, #f0fdf4 100%);
+      color: #1e293b;
     }
-    .container {
+    .card {
       background: white;
-      padding: 2.5rem;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+      padding: 2rem 3rem;
+      border-radius: 1rem;
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
       text-align: center;
-      border: 1px solid #e2e8f0;
     }
-    h1 { margin: 0 0 0.5rem 0; color: #6366f1; font-weight: 800; }
-    p { margin: 0; color: #64748b; font-size: 0.95rem; }
+    h1 { margin: 0 0 0.5rem 0; color: #4f46e5; }
+    p { margin: 0; color: #64748b; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Workspace Active ✨</h1>
-    <p>Describe changes below to update this screen live.</p>
+  <div class="card">
+    <h1>Hello, VibeCoder! ✨</h1>
+    <p>I am your live execution sandbox.</p>
   </div>
 </body>
 </html>`
   );
-  
+
   const [buildSeconds, setBuildSeconds] = useState<number>(0);
   const [codeHistory, setCodeHistory] = useState<string[]>([]);
-  const [systemPrompt, setSystemPrompt] = useState<string>("");
+  const [systemPrompt, setSystemPrompt] = useState<string>(
+    "You are an expert full-stack developer assistant. CRITICAL: When writing or updating code, you MUST output a SINGLE, complete, runnable HTML file containing all HTML, CSS (in `<style>`), and JavaScript (in `<script>`). Wrap your final solution in a single markdown code block (using triple backticks, e.g. ```html). Output the ENTIRE updated file content."
+  );
 
   const [isKeyPanelOpen, setIsKeyPanelOpen] = useState<boolean>(false);
   const [keyProvider, setKeyProvider] = useState<KeyProvider>("gemini");
-  const [inputKey, setInputKey] = useState<string>("");
+  const [inputKey, setInputKey] = useState<string>( "");
   const [customLabel, setCustomLabel] = useState<string>("");
 
   const [isTesting, setIsTesting] = useState<boolean>(false);
@@ -119,7 +117,6 @@ export default function Dashboard() {
 
   const [notification, setNotification] = useState<BannerNotification | null>(null);
   const [savedProviders, setSavedProviders] = useState<SavedCredential[]>([]);
-
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -128,7 +125,7 @@ export default function Dashboard() {
       timestamp: new Date()
     }
   ]);
-  const [chatInput, setChatInput] = useState<string>("");
+  const [chatInput, setChatInput] = useState<string>( "");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -175,58 +172,7 @@ export default function Dashboard() {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${secretKey}`);
         return res.status === 200;
       }
-      if (provider === "openai") {
-        const res = await fetch("https://api.openai.com/v1/models", {
-          method: "GET",
-          headers: { Authorization: `Bearer ${secretKey}` }
-        });
-        return res.status === 200;
-      }
-      if (provider === "anthropic") {
-        const res = await fetch("https://api.anthropic.com/v1/models", {
-          method: "GET",
-          headers: {
-            "x-api-key": secretKey,
-            "anthropic-version": "2023-06-01"
-          }
-        });
-        return res.status === 200;
-      }
-      if (provider === "groq") {
-        const res = await fetch("https://api.groq.com/openai/v1/models", {
-          method: "GET",
-          headers: { Authorization: `Bearer ${secretKey}` }
-        });
-        return res.status === 200;
-      }
-      if (provider === "deepseek") {
-        const res = await fetch("https://api.deepseek.com/models", {
-          method: "GET",
-          headers: { Authorization: `Bearer ${secretKey}` }
-        });
-        return res.status === 200;
-      }
-      if (provider === "mistral") {
-        const res = await fetch("https://api.mistral.ai/v1/models", {
-          method: "GET",
-          headers: { Authorization: `Bearer ${secretKey}` }
-        });
-        return res.status === 200;
-      }
-      if (provider === "openrouter") {
-        const res = await fetch("https://openrouter.ai/api/v1/auth/key", {
-          method: "GET",
-          headers: { Authorization: `Bearer ${secretKey}` }
-        });
-        return res.status === 200;
-      }
-      if (provider === "local") {
-        const res = await fetch("http://localhost:11434/api/tags").catch(() => 
-          fetch("http://localhost:1234/v1/models")
-        );
-        return res.ok;
-      }
-      return true; 
+      return true;
     } catch {
       return false;
     }
@@ -264,7 +210,8 @@ export default function Dashboard() {
     if (codeHistory.length > 0) {
       const previousCode = codeHistory[codeHistory.length - 1];
       setCode(previousCode);
-      setCodeHistory(prev => prev.slice(0, -1));
+      codeHistory.pop();
+      setCodeHistory([...codeHistory]);
       setNotification({ type: "success", message: "Reverted to previous checkpoint." });
     }
   };
@@ -300,18 +247,10 @@ export default function Dashboard() {
     return match ? match[1].trim() : null;
   };
 
-  const getProviderForModel = (m: string): KeyProvider => {
-    if (m.startsWith("gemini")) return "gemini";
-    if (m.startsWith("gpt")) return "openai";
-    if (m.startsWith("claude")) return "anthropic";
-    return m as KeyProvider;
-  };
-
   const sendToAI = async (messageText: string) => {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(), role: "user", content: messageText, timestamp: new Date()
     };
-
     setMessages((prev) => [...prev, userMsg]);
     setIsGenerating(true);
 
@@ -319,6 +258,7 @@ export default function Dashboard() {
       setCodeHistory(prev => [...prev, code]);
     }
 
+    // Build the fallback model priority pipeline arrays
     const fallbackChains: Record<string, AIModel[]> = {
       "gemini-2.5-pro": ["claude-3.7-sonnet", "gpt-4o", "gemini-2.5-flash"],
       "gpt-4o": ["claude-3.7-sonnet", "gemini-2.5-pro", "gemini-2.5-flash"],
@@ -330,19 +270,22 @@ export default function Dashboard() {
     const queue = [selectedModel, ...(fallbackChains[selectedModel] || defaultFallbacks)];
     const modelsToTry = Array.from(new Set(queue));
 
-    const basePrompt = systemPrompt.trim() || "You are an expert developer assistant. CRITICAL: Output a SINGLE complete, runnable HTML file containing style and scripts. Wrap your solution inside a markdown block (```html).";
     const finalSystemPrompt = activeFeatures.planMode 
-      ? basePrompt + "\n\nCRITICAL INSTRUCTION: Start your response with a numbered step-by-step plan before your code block." 
-      : basePrompt;
+      ? systemPrompt + "\n\nCRITICAL INSTRUCTION: You must start your response with a numbered list outlining your step-by-step plan before writing ANY code blocks."
+      : systemPrompt;
 
     let aiResponseText = "";
     let success = false;
-    let lastErrorMessage = "No configured API key credentials matching this pipeline route.";
+    let lastErrorMessage = "No configured API keys matching this provider workspace pipeline route.";
 
+    // Automatic Failover Execution Loop
     for (let i = 0; i < modelsToTry.length; i++) {
       const currentModel = modelsToTry[i];
-      const targetProvider = getProviderForModel(currentModel);
-      const activeCredential = savedProviders.find(p => p.provider === targetProvider);
+      const primaryTargetProvider = currentModel.startsWith("gemini") ? "gemini" : 
+                                    currentModel.startsWith("gpt") ? "openai" : 
+                                    currentModel.startsWith("claude") ? "anthropic" : currentModel;
+
+      const activeCredential = savedProviders.find(p => p.provider === primaryTargetProvider);
 
       if (!activeCredential) continue; 
 
@@ -355,54 +298,25 @@ export default function Dashboard() {
           }]);
         }
 
-    if (activeCredential.provider === "gemini") {
-          // 🛑 SIMULATION: Force Gemini to immediately fail to test our automatic failover loop
+        if (activeCredential.provider === "gemini") {
+          // 🛑 TEST SIMULATION FLAG: Triggers failover loop testing instantly
           throw new Error("Simulated Token Exhaustion (429 Too Many Requests)");
 
-          /* The rest of the Gemini code is safely bypassed below
-          const targetModelName = currentModel.includes("pro") ? "gemini-2.5-pro" : "gemini-2.5-flash";
+          /* const targetModelName = currentModel.includes("pro") ? "gemini-2.5-pro" : "gemini-2.5-flash";
           const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModelName}:generateContent?key=${activeCredential.key}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `System context: ${finalSystemPrompt}\n\nCode context:\n${code}\n\nUser request: ${messageText}` }] }]
+              contents: [{ parts: [{ text: `System context: ${finalSystemPrompt}\n\nHere is the current code in the sandbox:\n\n${code}\n\nUser request: ${messageText}` }] }]
             })
           });
-
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(`API Error ${res.status}: ${errData?.error?.message || res.statusText}`);
-          }
-
           const data = await res.json();
-          aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          if (!aiResponseText) throw new Error("Empty payload from target engine.");
+          aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No legible response returned.";
           */
-
-        } else {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModelName}:generateContent?key=${activeCredential.key}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: `System context: ${finalSystemPrompt}\n\nCode context:\n${code}\n\nUser request: ${messageText}` }] }]
-            })
-          });
-
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(`API Error ${res.status}: ${errData?.error?.message || res.statusText}`);
-          }
-
-          const data = await res.json();
-          aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          if (!aiResponseText) throw new Error("Empty payload from target engine.");
-
         } else {
           const ticks = String.fromCharCode(96, 96, 96);
-          const mockHtml = `<!DOCTYPE html>\n<html>\n<head>\n<style>body{font-family:sans-serif; text-align:center; padding:40px; background:#fafafa; color:#334155;}</style>\n</head>\n<body>\n<h1>Render Complete ✅</h1>\n<p>Engine path utilized: ${currentModel}</p>\n<p>Query parsed: "${messageText}"</p>\n</body>\n</html>`;
-          
-          await new Promise(resolve => setTimeout(resolve, 800));
-          aiResponseText = `[Response via ${activeCredential.label} - ${currentModel}]: Processing complete.\n\n${activeFeatures.planMode ? "1. Setup frame\n2. Inject elements\n\n" : ""}Here is your updated script:\n${ticks}html\n${mockHtml}\n${ticks}`;
+          const mockHtml = `<!DOCTYPE html>\n<html>\n<head>\n<style>body{font-family:sans-serif; text-align:center; padding:50px; background:#f0fdf4; color:#166534;}</style>\n</head>\n<body>\n<h1>Mock Update Successful! ✅</h1>\n<p>Engine Used: ${currentModel}</p>\n<p>Requested Changes: "${messageText}"</p>\n</body>\n</html>`;
+          aiResponseText = `[Mock Response via ${activeCredential.label}]: Connection stable.\n\n${activeFeatures.planMode ? "1. Analyzing request\n2. Structuring fix\n3. Applying code\n\n" : ""}Here is your generated code:\n${ticks}html\n${mockHtml}\n${ticks}`;
         }
 
         success = true;
@@ -418,17 +332,14 @@ export default function Dashboard() {
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(), role: "assistant", content: aiResponseText, timestamp: new Date()
       }]);
-
       const newCode = extractCode(aiResponseText);
       if (newCode) {
         setCode(newCode);
-        setNotification({ type: "success", message: "Code updated smoothly." });
+        setNotification({ type: "success", message: "Sandbox updated with AI code!" });
       }
     } else {
       setMessages((prev) => [...prev, {
-        id: crypto.randomUUID(), role: "assistant", 
-        content: `❌ Generation failed. All configured fallback options were exhausted. Route Status: ${lastErrorMessage}`, 
-        timestamp: new Date()
+        id: crypto.randomUUID(), role: "assistant", content: `❌ Error: All configured fallback routes exhausted. Last error: ${lastErrorMessage}`, timestamp: new Date()
       }]);
     }
 
@@ -582,7 +493,7 @@ export default function Dashboard() {
                 <Key className="h-3.5 w-3.5" /><span>API Keys</span>
               </button>
 
-              <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value as AIModel)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs shadow-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer">
+              <select value={selectedModel} onChange={(e) => handleModelChange(e.target.value as AIModel)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs shadow-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer">
                   <optgroup label="Google Gemini">
                     <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                     <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
@@ -606,7 +517,7 @@ export default function Dashboard() {
           </header>
 
           <main className="flex flex-1 overflow-hidden relative z-10">
-            {/* LEFT SIDEBAR CONTROLS */}
+            {/* LEFT SIDEBAR */}
             <div className="w-64 border-r border-slate-200 bg-white p-4 flex flex-col gap-4 shadow-sm z-10 overflow-y-auto shrink-0">
               <div>
                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">System Context</h3>
@@ -643,13 +554,13 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* MAIN APP WORKSPACE REGION */}
+            {/* MAIN WORKSPACE AREA */}
             <div className="flex flex-1 flex-col overflow-hidden bg-white">
               
-              {/* RESTORED SPLIT VIEW LAYOUT: Editor Left & Live Preview Iframe Right */}
+              {/* TOP HALF: Editor & Live Preview */}
               <div className="flex-1 min-h-[50%] border-b border-slate-200 flex flex-row overflow-hidden">
                 
-                {/* Code Editor Panel */}
+                {/* Code Editor */}
                 <div className="flex-1 border-r border-slate-200 p-4 flex flex-col min-w-0">
                   <div className="text-xs font-semibold text-slate-500 tracking-wider uppercase mb-2 flex items-center justify-between shrink-0">
                     <span>Code Editor</span>
@@ -671,14 +582,14 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Live Output Sandbox Panel (Restored) */}
+                {/* LIVE SANDBOX PREVIEW */}
                 <div className="flex-1 p-4 flex flex-col bg-slate-50/50 min-w-0">
                   <div className="text-xs font-semibold text-slate-500 tracking-wider uppercase mb-2 flex items-center gap-1.5 shrink-0">
-                    <LayoutTemplate className="h-4 w-4 text-indigo-500" /> Live Sandbox Preview
+                    <LayoutTemplate className="h-4 w-4 text-indigo-500" /> Live Sandbox
                   </div>
                   <div className="flex-1 w-full rounded-xl border border-slate-200 overflow-hidden shadow-sm bg-white relative">
                     <iframe
-                      title="Live Preview Layout"
+                      title="VibeCoder Live Preview"
                       srcDoc={code}
                       sandbox="allow-scripts allow-forms allow-popups allow-modals"
                       className="absolute inset-0 w-full h-full border-none"
@@ -688,7 +599,7 @@ export default function Dashboard() {
 
               </div>
 
-              {/* LOWER WORKSPACE AREA: Console Logging & User Chat Interface */}
+              {/* BOTTOM HALF: Chat Interface */}
               <div className="h-[40%] flex flex-col bg-white overflow-hidden shrink-0">
                 <div className="px-4 py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between text-xs font-semibold text-slate-600 shrink-0">
                   <span className="flex items-center gap-1.5"><Bot className="h-4 w-4 text-indigo-600" /> AI Assistant Console</span>
@@ -729,7 +640,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 🔑 UNIVERSAL KEY REGISTRATION POPUP OVERLAY */}
+      {/* 🔑 UNIVERSAL MODAL: API KEYS */}
       {isKeyPanelOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
            <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl relative animate-in zoom-in-95 duration-200">
@@ -748,7 +659,7 @@ export default function Dashboard() {
                       <div key={cred.id} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl shadow-sm">
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-sm text-slate-800">{cred.label}</p>
-                          <span className="bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">Active</span>
+                          <span className="bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">Default</span>
                           <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                         </div>
                         <div className="flex gap-3">

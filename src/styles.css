@@ -1,6 +1,10 @@
 body { 
-  background: linear-gradient(to right, #4f46e5, #0ea5e9, #10b981) !important; 
-} 
+  background-image: linear-gradient(to right, #4f46e5, #0ea5e9, #10b981) !important;
+  min-height: 100vh !important;
+  margin: 0 !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
 @import "tailwindcss";
 
 @theme {

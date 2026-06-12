@@ -1,9 +1,14 @@
-body { 
-  background-image: linear-gradient(to right, #4f46e5, #0ea5e9, #10b981) !important;
-  min-height: 100vh !important;
-  margin: 0 !important;
-  background-repeat: no-repeat !important;
+/* Apply the gradient to the body and make it fill the screen */
+body {
+  background: linear-gradient(to right, #4f46e5, #0ea5e9, #10b981) !important;
   background-attachment: fixed !important;
+  margin: 0 !important;
+  min-height: 100vh !important;
+}
+
+/* Force the React root and any solid white/slate backgrounds to be transparent so the body shows through */
+#root, .bg-slate-50, .bg-white {
+  background-color: transparent !important;
 }
 @import "tailwindcss";
 

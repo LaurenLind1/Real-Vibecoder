@@ -323,12 +323,14 @@ export default function Dashboard() {
     return match ? match[1].trim() : null;
   };
 
-  // ✅ Production-Ready Fallback Execution Loop
   const sendToAI = async (messageText: string) => {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(), role: "user", content: messageText, timestamp: new Date()
     };
-    setMessages((prev) => [...prev, userMsg]);
+    
+    // Create a local snapshot of messages including the new one to parse for history
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setIsGenerating(true);
 
     if (activeFeatures.checkpoints) {
@@ -341,14 +343,25 @@ export default function Dashboard() {
       ? basePrompt + "\n\nCRITICAL INSTRUCTION: You must start your response with a numbered list outlining your step-by-step plan before writing ANY code blocks."
       : basePrompt;
 
-    // Fixed correct provider mapping to prevent misidentifying primary keys
+    // 📚 SCRAPE AND FORMAT SAFE CONVERSATION HISTORY
+    // Filter out system warning banners and consolidate identical back-to-back roles so APIs don't crash
+    const safeHistory: { role: string, content: string }[] = [];
+    for (const m of messages) {
+      if (m.id === "welcome" || m.content.startsWith("⚠️") || m.content.startsWith("🔄") || m.content.startsWith("❌")) continue;
+      
+      if (safeHistory.length > 0 && safeHistory[safeHistory.length - 1].role === m.role) {
+         safeHistory[safeHistory.length - 1].content += `\n\n[Follow-up]: ${m.content}`;
+      } else {
+         safeHistory.push({ role: m.role, content: m.content });
+      }
+    }
+
     const primaryProvider = selectedModel.startsWith("gemini") ? "gemini" : 
                             selectedModel.startsWith("gpt") ? "openai" : 
                             selectedModel.startsWith("claude") ? "anthropic" : 
                             selectedModel === "local-llama" ? "local" :
                             (selectedModel as KeyProvider);
 
-    // Assembly line ordering: primary provider goes first, then everything else inside the key wallet acts as fallbacks
     const providersToTry: KeyProvider[] = [];
     if (savedProviders.find(p => p.provider === primaryProvider)) {
       providersToTry.push(primaryProvider);
@@ -370,7 +383,6 @@ export default function Dashboard() {
 
     let completedSuccessfully = false;
 
-    // Cascade Failover Loop through your added keys
     for (let i = 0; i < providersToTry.length; i++) {
       const currentProvider = providersToTry[i];
       const activeCredential = savedProviders.find(p => p.provider === currentProvider);
@@ -390,12 +402,27 @@ export default function Dashboard() {
         let aiResponseText = "";
 
         if (currentProvider === "gemini") {
+          // 🛑 CONVERSATIONAL MEMORY TEST TRIGGER
+          if (messageText.includes("SIMULATE CRASH")) {
+            throw new Error("User initiated manual failover test via 'SIMULATE CRASH' command.");
+          }
+
           const targetModelName = selectedModel.includes("pro") ? "gemini-2.5-pro" : "gemini-2.5-flash";
+          
+          // Inject history into Gemini payload
+          const geminiHistory = safeHistory.map(m => ({
+            role: m.role === "user" ? "user" : "model",
+            parts: [{ text: m.content }]
+          }));
+
           const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModelName}:generateContent?key=${activeCredential.key}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `System context: ${finalSystemPrompt}\n\nHere is the current code in the sandbox:\n\n${code}\n\nUser request: ${messageText}` }] }]
+              contents: [
+                ...geminiHistory,
+                { parts: [{ text: `System context: ${finalSystemPrompt}\n\nHere is the current code in the sandbox:\n\n${code}\n\nUser request: ${messageText}` }], role: "user" }
+              ]
             })
           });
 
@@ -404,13 +431,14 @@ export default function Dashboard() {
           aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No legible response returned.";
 
         } else {
-          // Live API connection calls for OpenAI, Anthropic, DeepSeek, Groq, OpenRouter, etc.
           const config = getProviderConfig(currentProvider, selectedModel);
 
+          // Inject history into standard OpenAI/Anthropic payloads
           const payload = config.format === "openai" ? {
             model: config.model,
             messages: [
               { role: "system", content: finalSystemPrompt },
+              ...safeHistory,
               { role: "user", content: `Here is the current code in the sandbox:\n\n${code}\n\nUser request: ${messageText}` }
             ],
             temperature: 0.2
@@ -418,7 +446,10 @@ export default function Dashboard() {
             model: config.model,
             max_tokens: 4000,
             system: finalSystemPrompt,
-            messages: [{ role: "user", content: `Here is the current code in the sandbox:\n\n${code}\n\nUser request: ${messageText}` }]
+            messages: [
+              ...safeHistory.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content })),
+              { role: "user", content: `Here is the current code in the sandbox:\n\n${code}\n\nUser request: ${messageText}` }
+            ]
           };
 
           const res = await fetch(config.url, {
@@ -445,8 +476,6 @@ export default function Dashboard() {
         const newCode = extractCode(aiResponseText);
         if (newCode) {
           setCode(newCode);
-          
-          // Fixed Notification System: Only states it used a backup pipeline if i > 0
           if (i > 0) {
             setNotification({ type: "success", message: `Sandbox updated via backup pipeline: ${currentProvider}!` });
           } else {
@@ -455,7 +484,7 @@ export default function Dashboard() {
         }
 
         completedSuccessfully = true;
-        break; // Stop loop, request successfully finished.
+        break; 
 
       } catch (err) {
         console.warn(`Pipeline engine [${currentProvider}] error:`, err);

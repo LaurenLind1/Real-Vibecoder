@@ -260,31 +260,31 @@ export default function Dashboard() {
       ? basePrompt + "\n\nCRITICAL INSTRUCTION: You must start your response with a numbered list outlining your step-by-step plan before writing ANY code blocks."
       : basePrompt;
 
-    // 1. Build the Fallover Queue Configuration Sequence
-    let providersToTry: KeyProvider[] = [];
-    if (selectedModel.startsWith("gemini")) {
-      providersToTry = ["gemini", "anthropic", "openai"];
-    } else if (selectedModel.startsWith("gpt")) {
-      providersToTry = ["openai"];
-    } else if (selectedModel.startsWith("claude")) {
-      providersToTry = ["anthropic"];
-    } else {
-      providersToTry = [selectedModel as KeyProvider];
-    }
+    // 1. DYNAMICALLY DETECT THE PRIMARY SELECTION
+    const primaryProvider = selectedModel.startsWith("gemini") ? "gemini" : 
+                            selectedModel.startsWith("gpt") ? "openai" : 
+                            selectedModel.startsWith("claude") ? "anthropic" : 
+                            (selectedModel as KeyProvider);
+
+    // 2. SCRAPE ALL OTHER ENGINES THE USER HAS REGISTERED IN THEIR APP FOR BACKUPS
+    const uniqueBackups = Array.from(
+      new Set(savedProviders.map(p => p.provider).filter(p => p !== primaryProvider))
+    );
+
+    // 3. COMBINE THEM: Primary goes first, then EVERY other key acts as a sequential fallback layer
+    const providersToTry: KeyProvider[] = [primaryProvider, ...uniqueBackups];
 
     let completedSuccessfully = false;
 
-    // 2. Step through the failover sequence loop
+    // 4. Step through the dynamic failover sequence loop
     for (let i = 0; i < providersToTry.length; i++) {
       const currentProvider = providersToTry[i];
       const activeCredential = savedProviders.find(p => p.provider === currentProvider);
 
-      // If the user has not configured a saved key for this backup slot, move to next in line
       if (!activeCredential) {
         continue;
       }
 
-      // If we are executing on a fallback choice, inject a visible update notice in the chat log
       if (i > 0) {
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
@@ -298,30 +298,17 @@ export default function Dashboard() {
         let aiResponseText = "";
 
         if (currentProvider === "gemini") {
-          // 👇 LIVE TEST EXHAUSTION ERROR INTERCEPTION
+          // LIVE INTERCEPT SIMULATION (Crashes the Gemini path)
           throw new Error("Simulated Token Exhaustion (HTTP 429 Rate Limit Exceeded)");
-
-          /* const targetModelName = selectedModel.includes("pro") ? "gemini-2.5-pro" : "gemini-2.5-flash";
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModelName}:generateContent?key=${activeCredential.key}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: `System context: ${finalSystemPrompt}\n\nHere is the current code in the sandbox:\n\n${code}\n\nUser request: ${messageText}` }] }]
-            })
-          });
-          const data = await res.json();
-          aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No legible response returned.";
-          */
         } else {
-          // Backup Mock response pipeline execution path
+          // Generic execution track for ANY custom/backup provider
           const ticks = String.fromCharCode(96, 96, 96);
-          const mockHtml = `<!DOCTYPE html>\n<html>\n<head>\n<style>body{font-family:sans-serif; text-align:center; padding:50px; background:#f0fdf4; color:#166534;}</style>\n</head>\n<body>\n<h1>Automatic Failover Routing Successful! ✅</h1>\n<p>Backup Engine Triggered: <strong>${currentProvider}</strong></p>\n<p>Prompt Processed: "${messageText}"</p>\n</body>\n</html>`;
+          const mockHtml = `<!DOCTYPE html>\n<html>\n<head>\n<style>body{font-family:sans-serif; text-align:center; padding:50px; background:#f4f0ff; color:#5b21b6;}</style>\n</head>\n<body>\n<h1>Dynamic Failover Activated! 🚀</h1>\n<p>Active Fallback Engine: <strong>${currentProvider}</strong></p>\n<p>Config Label Applied: <em>${activeCredential.label}</em></p>\n</body>\n</html>`;
           
-          aiResponseText = `[Failover Response via ${activeCredential.label}]: Gemini pipeline hit exhaustion. Successfully routed prompt to backup slot.\n\n${activeFeatures.planMode ?
-            "1. Intercepted 429 Error\n2. Loaded Secondary Credentials\n3. Generated Layout Fix\n\n" : ""}Here is your safe execution code:\n${ticks}html\n${mockHtml}\n${ticks}`;
+          aiResponseText = `[Failover Response via ${activeCredential.label}]: Primary pipeline failed. Dynamic backup router successfully processing request via ${currentProvider}.\n\n${activeFeatures.planMode ?
+            "1. Caught upstream error\n2. Loaded dynamic credentials\n3. Rendering playground updates\n\n" : ""}Here is your safe execution code:\n${ticks}html\n${mockHtml}\n${ticks}`;
         }
 
-        // Output response to chat timeline
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(), role: "assistant", content: aiResponseText, timestamp: new Date()
         }]);
@@ -329,45 +316,31 @@ export default function Dashboard() {
         const newCode = extractCode(aiResponseText);
         if (newCode) {
           setCode(newCode);
-          setNotification({ type: "success", message: "Sandbox updated with backup AI code!" });
+          setNotification({ type: "success", message: `Sandbox updated via backup: ${currentProvider}!` });
         }
 
         completedSuccessfully = true;
-        break; // Successfully handled, exit sequence loop
+        break; 
 
       } catch (err) {
         console.warn(`Provider [${currentProvider}] encountered an error:`, err);
         
-        // Push a warning block to the chat screen instantly so the user knows an error occurred
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: `⚠️ Engine [${currentProvider}] failed: ${(err as Error).message}. Attempting automatic failover cascade...`,
+          content: `⚠️ Engine [${currentProvider}] failed: ${(err as Error).message}. Cascading to next available key...`,
           timestamp: new Date()
         }]);
       }
     }
 
-    // 3. Fallback handle: explicit response explanation if everything in the sequence failed or skipped
     if (!completedSuccessfully) {
-      const remainingBackups = providersToTry.filter(p => p !== "gemini");
-      const hasAnyBackupKeysSaved = remainingBackups.some(p => savedProviders.some(sp => sp.provider === p));
-
-      if (!hasAnyBackupKeysSaved) {
-        setMessages((prev) => [...prev, {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: `❌ Primary provider failed (Simulated Exhaustion Error), and you have NO backup keys configured.\n\nTo make the automated loop switch to another engine, open the "API Keys" menu and add a secondary backup key (such as OpenAI or Anthropic Claude).`,
-          timestamp: new Date()
-        }]);
-      } else {
-        setMessages((prev) => [...prev, {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: `❌ Failover execution exhausted. All configured providers in the sequence queue returned errors.`,
-          timestamp: new Date()
-        }]);
-      }
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `❌ Failover routing exhausted. No secondary provider keys match your configured wallet credentials. Please open the "API Keys" manager and add a alternative provider key (e.g. DeepSeek, Groq, Mistral, OpenRouter, etc.).`,
+        timestamp: new Date()
+      }]);
     }
 
     setIsGenerating(false);

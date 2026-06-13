@@ -518,7 +518,7 @@ export default function Dashboard() {
   return (
     <>
       {notification && (
-        <div className="fixed top-4 right-4 z-[100] w-full max-w-sm animate-in fade-in slide-in-from-top-4 duration-200">
+        <div className="fixed top-4 right-4 z-[300] w-full max-w-sm animate-in fade-in slide-in-from-top-4 duration-200">
           <div className={`flex items-center gap-3 rounded-xl border p-4 shadow-xl text-sm font-medium ${
             notification.type === "success" ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-rose-50 border-rose-200 text-rose-800"
           }`}>
@@ -851,7 +851,7 @@ export default function Dashboard() {
                     
                     <div>
                       <label className="text-xs font-medium text-slate-700 mb-1.5 flex items-center gap-1">Get a key <ArrowRight className="h-3 w-3 -rotate-45" /></label>
-                      <input type="password" placeholder="Enter API Key Secret" value={inputKey} onChange={(e) => setInputKey(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 mb-3" />
+                      <input type="password" placeholder="Enter API Key" value={inputKey} onChange={(e) => setInputKey(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20 mb-3" />
                       <input type="text" placeholder="Label (optional)" value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
                     </div>
 

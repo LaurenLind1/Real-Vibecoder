@@ -52,6 +52,60 @@ interface Project {
   fileCount: number;
 }
 
+// Configuration helper to resolve live endpoints and standard model identifiers for all fallback providers
+const getProviderConfig = (provider: KeyProvider, selectedModel: string) => {
+  switch (provider) {
+    case "openai":
+      return {
+        url: "https://api.openai.com/v1/chat/completions",
+        model: selectedModel.startsWith("gpt") ? selectedModel : "gpt-4o",
+        format: "openai" as const
+      };
+    case "anthropic":
+      return {
+        url: "https://api.anthropic.com/v1/messages",
+        model: selectedModel.startsWith("claude") ? selectedModel : "claude-3-7-sonnet-20250219",
+        format: "anthropic" as const
+      };
+    case "deepseek":
+      return {
+        url: "https://api.deepseek.com/v1/chat/completions",
+        model: "deepseek-chat",
+        format: "openai" as const
+      };
+    case "groq":
+      return {
+        url: "https://api.groq.com/openai/v1/chat/completions",
+        model: "llama3-8b-8192",
+        format: "openai" as const
+      };
+    case "mistral":
+      return {
+        url: "https://api.mistral.ai/v1/chat/completions",
+        model: "mistral-large-latest",
+        format: "openai" as const
+      };
+    case "openrouter":
+      return {
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        model: "google/gemini-2.5-flash",
+        format: "openai" as const
+      };
+    case "local":
+      return {
+        url: "http://localhost:11434/v1/chat/completions",
+        model: "llama3",
+        format: "openai" as const
+      };
+    default:
+      return {
+        url: "https://api.openai.com/v1/chat/completions",
+        model: selectedModel,
+        format: "openai" as const
+      };
+  }
+};
+
 export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState<PageView>("home");
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
@@ -260,36 +314,48 @@ export default function Dashboard() {
       ? basePrompt + "\n\nCRITICAL INSTRUCTION: You must start your response with a numbered list outlining your step-by-step plan before writing ANY code blocks."
       : basePrompt;
 
-    // 1. DYNAMICALLY DETECT THE PRIMARY SELECTION
+    // 1. Detect intended primary engine provider setup
     const primaryProvider = selectedModel.startsWith("gemini") ? "gemini" : 
                             selectedModel.startsWith("gpt") ? "openai" : 
                             selectedModel.startsWith("claude") ? "anthropic" : 
                             (selectedModel as KeyProvider);
 
-    // 2. SCRAPE ALL OTHER ENGINES THE USER HAS REGISTERED IN THEIR APP FOR BACKUPS
-    const uniqueBackups = Array.from(
-      new Set(savedProviders.map(p => p.provider).filter(p => p !== primaryProvider))
-    );
+    // 2. Build ordered pipeline sequence (Primary goes first, then any other saved fallback credentials)
+    const providersToTry: KeyProvider[] = [];
+    if (savedProviders.find(p => p.provider === primaryProvider)) {
+      providersToTry.push(primaryProvider);
+    }
+    savedProviders.forEach(p => {
+      if (!providersToTry.includes(p.provider)) {
+        providersToTry.push(p.provider);
+      }
+    });
 
-    // 3. COMBINE THEM: Primary goes first, then EVERY other key acts as a sequential fallback layer
-    const providersToTry: KeyProvider[] = [primaryProvider, ...uniqueBackups];
+    if (providersToTry.length === 0) {
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `⚠️ No active key found. Please configuration wallet with the "API Keys" button to start text generation pipelines.`,
+        timestamp: new Date()
+      }]);
+      setIsGenerating(false);
+      return;
+    }
 
     let completedSuccessfully = false;
 
-    // 4. Step through the dynamic failover sequence loop
+    // 3. Sequential dynamic failover routing loop
     for (let i = 0; i < providersToTry.length; i++) {
       const currentProvider = providersToTry[i];
       const activeCredential = savedProviders.find(p => p.provider === currentProvider);
 
-      if (!activeCredential) {
-        continue;
-      }
+      if (!activeCredential) continue;
 
       if (i > 0) {
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: `🔄 Rerouting pipeline... Automatically switching to fallback engine: "${activeCredential.label}" (${currentProvider})`,
+          content: `🔄 Automatically switching to dynamic fallback backup engine: "${activeCredential.label}" (${currentProvider})`,
           timestamp: new Date()
         }]);
       }
@@ -298,15 +364,83 @@ export default function Dashboard() {
         let aiResponseText = "";
 
         if (currentProvider === "gemini") {
-          // LIVE INTERCEPT SIMULATION (Crashes the Gemini path)
-          throw new Error("Simulated Token Exhaustion (HTTP 429 Rate Limit Exceeded)");
+          const targetModelName = selectedModel.includes("pro") ? "gemini-2.5-pro" : "gemini-2.5-flash";
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModelName}:generateContent?key=${activeCredential.key}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `System context: ${finalSystemPrompt}\n\nHere is the current code in the sandbox:\n\n${code}\n\nUser request: ${messageText}` }] }]
+            })
+          });
+
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({}));
+            throw new Error(errBody.error?.message || `HTTP error ${res.status}`);
+          }
+
+          const data = await res.json();
+          aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No legible response returned.";
+
         } else {
-          // Generic execution track for ANY custom/backup provider
-          const ticks = String.fromCharCode(96, 96, 96);
-          const mockHtml = `<!DOCTYPE html>\n<html>\n<head>\n<style>body{font-family:sans-serif; text-align:center; padding:50px; background:#f4f0ff; color:#5b21b6;}</style>\n</head>\n<body>\n<h1>Dynamic Failover Activated! 🚀</h1>\n<p>Active Fallback Engine: <strong>${currentProvider}</strong></p>\n<p>Config Label Applied: <em>${activeCredential.label}</em></p>\n</body>\n</html>`;
-          
-          aiResponseText = `[Failover Response via ${activeCredential.label}]: Primary pipeline failed. Dynamic backup router successfully processing request via ${currentProvider}.\n\n${activeFeatures.planMode ?
-            "1. Caught upstream error\n2. Loaded dynamic credentials\n3. Rendering playground updates\n\n" : ""}Here is your safe execution code:\n${ticks}html\n${mockHtml}\n${ticks}`;
+          // LIVE INTERCEPT: Fetches live completions for OpenAI / DeepSeek / Groq / Mistral / OpenRouter / Anthropic
+          const config = getProviderConfig(currentProvider, selectedModel);
+
+          if (config.format === "openai") {
+            const res = await fetch(config.url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${activeCredential.key}`,
+                ...(currentProvider === "openrouter" ? {
+                  "HTTP-Origin": window.location.origin,
+                  "Title": "VibeCoder"
+                } : {})
+              },
+              body: JSON.stringify({
+                model: config.model,
+                messages: [
+                  { role: "system", content: finalSystemPrompt },
+                  { role: "user", content: `Here is the current code in the sandbox:\n\n${code}\n\nUser request: ${messageText}` }
+                ],
+                temperature: 0.2
+              })
+            });
+
+            if (!res.ok) {
+              const errBody = await res.json().catch(() => ({}));
+              throw new Error(errBody.error?.message || `HTTP error ${res.status}`);
+            }
+
+            const data = await res.json();
+            aiResponseText = data.choices?.[0]?.message?.content || "";
+
+          } else if (config.format === "anthropic") {
+            const res = await fetch(config.url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": activeCredential.key,
+                "anthropic-version": "2023-06-01",
+                "anthropic-dangerous-direct-profiles-allowed": "true"
+              },
+              body: JSON.stringify({
+                model: config.model,
+                max_tokens: 4000,
+                system: finalSystemPrompt,
+                messages: [
+                  { role: "user", content: `Here is the current code in the sandbox:\n\n${code}\n\nUser request: ${messageText}` }
+                ]
+              })
+            });
+
+            if (!res.ok) {
+              const errBody = await res.json().catch(() => ({}));
+              throw new Error(errBody.error?.message || `HTTP error ${res.status}`);
+            }
+
+            const data = await res.json();
+            aiResponseText = data.content?.[0]?.text || "";
+          }
         }
 
         setMessages((prev) => [...prev, {
@@ -320,15 +454,14 @@ export default function Dashboard() {
         }
 
         completedSuccessfully = true;
-        break; 
+        break; // Successfully fulfilled request, breakout cascade track
 
       } catch (err) {
-        console.warn(`Provider [${currentProvider}] encountered an error:`, err);
-        
+        console.warn(`Provider [${currentProvider}] pipeline failed:`, err);
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: `⚠️ Engine [${currentProvider}] failed: ${(err as Error).message}. Cascading to next available key...`,
+          content: `⚠️ Engine [${currentProvider}] failed: ${(err as Error).message}. Cascading downstream...`,
           timestamp: new Date()
         }]);
       }
@@ -338,7 +471,7 @@ export default function Dashboard() {
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: `❌ Failover routing exhausted. No secondary provider keys match your configured wallet credentials. Please open the "API Keys" manager and add a alternative provider key (e.g. DeepSeek, Groq, Mistral, OpenRouter, etc.).`,
+        content: `❌ Failover routing path completely exhausted. None of your configured credentials processed the workspace update successfully.`,
         timestamp: new Date()
       }]);
     }

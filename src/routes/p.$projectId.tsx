@@ -260,10 +260,10 @@ export default function Dashboard() {
       ? basePrompt + "\n\nCRITICAL INSTRUCTION: You must start your response with a numbered list outlining your step-by-step plan before writing ANY code blocks."
       : basePrompt;
 
-    // 1. Build the Sequence Queue based on what model was selected in the UI dropdown
+    // 1. Build the Fallover Queue Configuration Sequence
     let providersToTry: KeyProvider[] = [];
     if (selectedModel.startsWith("gemini")) {
-      providersToTry = ["gemini", "anthropic", "openai"]; // Automatic Failover Routing Sequence
+      providersToTry = ["gemini", "anthropic", "openai"];
     } else if (selectedModel.startsWith("gpt")) {
       providersToTry = ["openai"];
     } else if (selectedModel.startsWith("claude")) {
@@ -274,20 +274,22 @@ export default function Dashboard() {
 
     let completedSuccessfully = false;
 
-    // 2. Step through the queue loop sequentially
+    // 2. Step through the failover sequence loop
     for (let i = 0; i < providersToTry.length; i++) {
       const currentProvider = providersToTry[i];
       const activeCredential = savedProviders.find(p => p.provider === currentProvider);
 
-      // Skip this engine provider if the user doesn't have a saved key for it
-      if (!activeCredential) continue;
+      // If the user has not configured a saved key for this backup slot, move to next in line
+      if (!activeCredential) {
+        continue;
+      }
 
-      // Visual pipeline notification if the loop drops back into a secondary key
+      // If we are executing on a fallback choice, inject a visible update notice in the chat log
       if (i > 0) {
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: `⚠️ Engine exhausted or restricted. Automatically falling back to ${currentProvider}...`,
+          content: `🔄 Rerouting pipeline... Automatically switching to fallback engine: "${activeCredential.label}" (${currentProvider})`,
           timestamp: new Date()
         }]);
       }
@@ -296,8 +298,8 @@ export default function Dashboard() {
         let aiResponseText = "";
 
         if (currentProvider === "gemini") {
-          // 👇 TEST INTERCEPT SIMULATION: Immediately crashes the Gemini path to verify the fallback routing loop works
-          throw new Error("Simulated Token Exhaustion (429 Rate Limit Exceeded)");
+          // 👇 LIVE TEST EXHAUSTION ERROR INTERCEPTION
+          throw new Error("Simulated Token Exhaustion (HTTP 429 Rate Limit Exceeded)");
 
           /* const targetModelName = selectedModel.includes("pro") ? "gemini-2.5-pro" : "gemini-2.5-flash";
           const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModelName}:generateContent?key=${activeCredential.key}`, {
@@ -311,15 +313,15 @@ export default function Dashboard() {
           aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No legible response returned.";
           */
         } else {
-          // Safe Sandbox Mock Response Pathway
+          // Backup Mock response pipeline execution path
           const ticks = String.fromCharCode(96, 96, 96);
-          const mockHtml = `<!DOCTYPE html>\n<html>\n<head>\n<style>body{font-family:sans-serif; text-align:center; padding:50px; background:#f0fdf4; color:#166534;}</style>\n</head>\n<body>\n<h1>Mock Update Successful! ✅</h1>\n<p>Engine Used: ${currentProvider}</p>\n<p>Requested: ${messageText}</p>\n<script>console.log("Mock JS executed");</script>\n</body>\n</html>`;
+          const mockHtml = `<!DOCTYPE html>\n<html>\n<head>\n<style>body{font-family:sans-serif; text-align:center; padding:50px; background:#f0fdf4; color:#166534;}</style>\n</head>\n<body>\n<h1>Automatic Failover Routing Successful! ✅</h1>\n<p>Backup Engine Triggered: <strong>${currentProvider}</strong></p>\n<p>Prompt Processed: "${messageText}"</p>\n</body>\n</html>`;
           
-          aiResponseText = `[Mock Response via ${activeCredential.label}]: Received message "${messageText}".\n\n${activeFeatures.planMode ?
-            "1. Analyzing request\n2. Structuring fix\n3. Applying code\n\n" : ""}Here is your generated code:\n${ticks}html\n${mockHtml}\n${ticks}`;
+          aiResponseText = `[Failover Response via ${activeCredential.label}]: Gemini pipeline hit exhaustion. Successfully routed prompt to backup slot.\n\n${activeFeatures.planMode ?
+            "1. Intercepted 429 Error\n2. Loaded Secondary Credentials\n3. Generated Layout Fix\n\n" : ""}Here is your safe execution code:\n${ticks}html\n${mockHtml}\n${ticks}`;
         }
 
-        // Output response and handle updates if code ran smoothly
+        // Output response to chat timeline
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(), role: "assistant", content: aiResponseText, timestamp: new Date()
         }]);
@@ -327,34 +329,42 @@ export default function Dashboard() {
         const newCode = extractCode(aiResponseText);
         if (newCode) {
           setCode(newCode);
-          setNotification({ type: "success", message: "Sandbox updated with AI code!" });
+          setNotification({ type: "success", message: "Sandbox updated with backup AI code!" });
         }
 
         completedSuccessfully = true;
-        break; // Success! Break out of the fallback queue
+        break; // Successfully handled, exit sequence loop
 
       } catch (err) {
-        console.warn(`Provider [${currentProvider}] error intercepted:`, err);
-        // If everything in the queue has been exhausted and failed, post final error message
-        if (i === providersToTry.length - 1) {
-          setMessages((prev) => [...prev, {
-            id: crypto.randomUUID(), role: "assistant", content: `❌ Final Error: ${(err as Error).message}`, timestamp: new Date()
-          }]);
-        }
+        console.warn(`Provider [${currentProvider}] encountered an error:`, err);
+        
+        // Push a warning block to the chat screen instantly so the user knows an error occurred
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `⚠️ Engine [${currentProvider}] failed: ${(err as Error).message}. Attempting automatic failover cascade...`,
+          timestamp: new Date()
+        }]);
       }
     }
 
-    // 3. Inform user if they have zero configured matching credentials for the targeted sequence loop
+    // 3. Fallback handle: explicit response explanation if everything in the sequence failed or skipped
     if (!completedSuccessfully) {
-      const activeKeysMatch = providersToTry.some(p => savedProviders.some(sp => sp.provider === p));
-      if (!activeKeysMatch) {
-        const primaryTargetProvider = selectedModel.startsWith("gemini") ? "gemini" : 
-                                      selectedModel.startsWith("gpt") ? "openai" : 
-                                      selectedModel.startsWith("claude") ? "anthropic" : selectedModel;
+      const remainingBackups = providersToTry.filter(p => p !== "gemini");
+      const hasAnyBackupKeysSaved = remainingBackups.some(p => savedProviders.some(sp => sp.provider === p));
+
+      if (!hasAnyBackupKeysSaved) {
         setMessages((prev) => [...prev, {
-          id: crypto.randomUUID(), 
-          role: "assistant", 
-          content: `⚠️ No active key found for "${primaryTargetProvider}". Please use the "API Keys" button to get connected.`, 
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `❌ Primary provider failed (Simulated Exhaustion Error), and you have NO backup keys configured.\n\nTo make the automated loop switch to another engine, open the "API Keys" menu and add a secondary backup key (such as OpenAI or Anthropic Claude).`,
+          timestamp: new Date()
+        }]);
+      } else {
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `❌ Failover execution exhausted. All configured providers in the sequence queue returned errors.`,
           timestamp: new Date()
         }]);
       }

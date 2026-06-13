@@ -338,8 +338,10 @@ export default function Dashboard() {
 
     const basePrompt = systemPrompt.trim() ||
       "You are an expert full-stack developer assistant. CRITICAL: When writing or updating code, you MUST output a SINGLE, complete, runnable HTML file containing all HTML, CSS (in `<style>`), and JavaScript (in `<script>`). Wrap your final solution in a single markdown code block (using triple backticks, e.g. ```html). Output the ENTIRE updated file content.";
+    
+    // 🔥 UPDATED: Strict isolation of planning vs coding instructions
     const finalSystemPrompt = activeFeatures.planMode 
-      ? basePrompt + "\n\nCRITICAL INSTRUCTION: You must start your response with a numbered list outlining your step-by-step plan before writing ANY code blocks."
+      ? (systemPrompt.trim() || "You are an expert full-stack developer assistant.") + "\n\nCRITICAL INSTRUCTION: You are currently in PLAN MODE. You must ONLY output a numbered step-by-step plan outlining how to solve the request. DO NOT output any code blocks. DO NOT write HTML, CSS, or JavaScript. Wait until the user disables Plan Mode before writing actual code."
       : basePrompt;
 
     const safeHistory: { role: string, content: string }[] = [];

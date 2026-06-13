@@ -233,7 +233,6 @@ export default function Dashboard() {
     setSelectedModel(model);
   };
 
-  // ✅ FIX 1: Real Network Probe for testing Key Health validation across any provider
   const runKeyValidationProbe = async (provider: KeyProvider, secretKey: string): Promise<boolean> => {
     try {
       if (provider === "gemini") {
@@ -324,7 +323,7 @@ export default function Dashboard() {
     return match ? match[1].trim() : null;
   };
 
-  // ✅ FIX 2: Production-Ready Fallback Execution Loop
+  // ✅ Production-Ready Fallback Execution Loop
   const sendToAI = async (messageText: string) => {
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(), role: "user", content: messageText, timestamp: new Date()
@@ -342,9 +341,11 @@ export default function Dashboard() {
       ? basePrompt + "\n\nCRITICAL INSTRUCTION: You must start your response with a numbered list outlining your step-by-step plan before writing ANY code blocks."
       : basePrompt;
 
+    // Fixed correct provider mapping to prevent misidentifying primary keys
     const primaryProvider = selectedModel.startsWith("gemini") ? "gemini" : 
                             selectedModel.startsWith("gpt") ? "openai" : 
                             selectedModel.startsWith("claude") ? "anthropic" : 
+                            selectedModel === "local-llama" ? "local" :
                             (selectedModel as KeyProvider);
 
     // Assembly line ordering: primary provider goes first, then everything else inside the key wallet acts as fallbacks
@@ -380,7 +381,7 @@ export default function Dashboard() {
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: `🔄 Switched to operational backup fallback engine: "${activeCredential.label}" (${currentProvider})`,
+          content: `🔄 Rerouting... Switched to operational backup fallback engine: "${activeCredential.label}" (${currentProvider})`,
           timestamp: new Date()
         }]);
       }
@@ -444,7 +445,13 @@ export default function Dashboard() {
         const newCode = extractCode(aiResponseText);
         if (newCode) {
           setCode(newCode);
-          setNotification({ type: "success", message: `Sandbox updated via backup pipeline: ${currentProvider}!` });
+          
+          // Fixed Notification System: Only states it used a backup pipeline if i > 0
+          if (i > 0) {
+            setNotification({ type: "success", message: `Sandbox updated via backup pipeline: ${currentProvider}!` });
+          } else {
+            setNotification({ type: "success", message: `Sandbox updated successfully!` });
+          }
         }
 
         completedSuccessfully = true;
